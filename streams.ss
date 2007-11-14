@@ -1,4 +1,4 @@
-; STREAMS.SS PLB 22OCT2007
+; STREAMS.SS PLB 9NOV2007
 
 ; Copyright (C) 2007 by Philip L. Bewig of Saint Louis, Missouri, USA.  All rights
 ; reserved.  Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -104,7 +104,7 @@
 (define (field-index type tag)
   (let loop ((i 1) (tags (record-type-field-tags type)))
     (cond ((null? tags)
-           (error "record type has no such field" type tag))
+           (error 'field-index "record type has no such field" type tag))
           ((eq? tag (car tags))
            i)
           (else
@@ -126,7 +126,7 @@
                       args
                       indexes)
             new)
-          (error "wrong number of arguments to constructor" type args)))))
+          (error 'record-constructor "wrong number of arguments to constructor" type args)))))
 
 (define (record-predicate type)
   (lambda (thing)
@@ -141,7 +141,7 @@
                (eq? (record-type thing)
                     type))
           (record-ref thing index)
-          (error "accessor applied to bad value" type tag thing)))))
+          (error 'record-accessor "accessor applied to bad value" type tag thing)))))
 
 (define (record-modifier type tag)
   (let ((index (field-index type tag)))
@@ -150,13 +150,13 @@
                (eq? (record-type thing)
                     type))
           (record-set! thing index value)
-          (error "modifier applied to bad value" type tag thing)))))
+          (error 'record-modifier "modifier applied to bad value" type tag thing)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; SRFI-23 errors
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; SRFI-23 errors (modified for R6RS)
 
 (define (error reason . args)
   (display "Error: ")
-  (display reason)
+  (display (symbol->string reason))
   (for-each (lambda (arg) 
             (display " ")
             (write arg))
@@ -164,7 +164,7 @@
   (newline)
   (scheme-report-environment -1))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; stream-primitives
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; (streams primitive)
 
   (define-record-type stream-type
     (make-stream box)
@@ -220,13 +220,13 @@
         (stream-delay (make-stream-pare (stream-delay obj) (stream-lazy strm))))))
 
   (define (stream-car strm)
-    (cond ((not (stream? strm)) (error "attempt to take stream-car of non-stream"))
-          ((stream-null? strm) (error "attempt to take stream-car of null stream"))
+    (cond ((not (stream? strm)) (error 'stream-car "non-stream"))
+          ((stream-null? strm) (error 'stream-car "null stream"))
           (else (stream-force (stream-kar (stream-force strm))))))
 
   (define (stream-cdr strm)
-    (cond ((not (stream? strm)) (error "attempt to take stream-cdr of non-stream"))
-          ((stream-null? strm) (error "attempt to take stream-cdr of null stream"))
+    (cond ((not (stream? strm)) (error 'stream-cdr "non-stream"))
+          ((stream-null? strm) (error 'stream-cdr "null stream"))
           (else (stream-kdr (stream-force strm)))))
 
   (define-syntax stream-lambda
@@ -234,19 +234,17 @@
       ((stream-lambda formals body0 body1 ...)
         (lambda formals (stream-lazy (let () body0 body1 ...))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; stream-derived
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; (streams derived)
 
-  (define (ormap pred? . lists)
+  (define (exists pred? . lists)
     (and (not (null? (car lists)))
          (or (apply pred? (map car lists))
-             (apply ormap pred? (map cdr lists)))))
+             (apply exists pred? (map cdr lists)))))
 
   (define-syntax define-stream
     (syntax-rules ()
       ((define-stream (name . formal) body0 body1 ...)
-        (define name (stream-lambda formal body0 body1 ...)))
-      ((define-stream (name formals ...) body0 body1 ...)
-        (define name (stream-lambda (formals ...) body0 body1 ...)))))
+        (define name (stream-lambda formal body0 body1 ...)))))
 
   (define (list->stream objs)
     (define list->stream
@@ -255,7 +253,7 @@
             stream-null
             (stream-cons (car objs) (list->stream (cdr objs))))))
     (if (not (list? objs))
-        (error "non-list argument to list->stream")
+        (error 'list->stream "non-list argument")
         (list->stream objs)))
 
   (define (port->stream . port)
@@ -267,7 +265,7 @@
               (stream-cons c (port->stream p))))))
     (let ((p (if (null? port) (current-input-port) (car port))))
       (if (not (input-port? p))
-          (error "non-input-port argument to port->stream")
+          (error 'port->stream "non-input-port argument")
           (port->stream p))))
 
   (define-syntax stream
@@ -278,9 +276,9 @@
   (define (stream->list . args)
     (let ((n (if (= 1 (length args)) #f (car args)))
           (strm (if (= 1 (length args)) (car args) (cadr args))))
-      (cond ((not (stream? strm)) (error "non-stream argument to stream->list"))
-            ((and n (not (integer? n))) (error "non-integer count to stream->list"))
-            ((and n (negative? n)) (error "negative count to stream->list"))
+      (cond ((not (stream? strm)) (error 'stream->list "non-stream argument"))
+            ((and n (not (integer? n))) (error 'stream->list "non-integer count"))
+            ((and n (negative? n)) (error 'stream->list "negative count"))
             (else (let loop ((n (if n n -1)) (strm strm))
                     (if (or (zero? n) (stream-null? strm))
                         '()
@@ -294,8 +292,8 @@
               (else (stream-cons (stream-car (car strms))
                                  (stream-append (cons (stream-cdr (car strms)) (cdr strms))))))))
     (cond ((null? strms) stream-null)
-          ((ormap (lambda (x) (not (stream? x))) strms)
-            (error "non-stream argument to stream-append"))
+          ((exists (lambda (x) (not (stream? x))) strms)
+            (error 'stream-append "non-stream argument"))
           (else (stream-append strms))))
   
   (define (stream-concat strms)
@@ -303,7 +301,7 @@
       (stream-lambda (strms)
         (cond ((stream-null? strms) stream-null)
               ((not (stream? (stream-car strms)))
-                (error "non-stream object in input stream of string-concat"))
+                (error 'stream-concat "non-stream object in input stream"))
               ((stream-null? (stream-car strms))
                 (stream-concat (stream-cdr strms)))
               (else (stream-cons
@@ -311,7 +309,7 @@
                       (stream-concat
                         (stream-cons (stream-cdr (stream-car strms)) (stream-cdr strms))))))))
     (if (not (stream? strms))
-        (error "non-stream argument to stream-concat")
+        (error 'stream-concat "non-stream argument")
         (stream-concat strms)))
 
   (define stream-constant
@@ -327,9 +325,9 @@
         (if (or (zero? n) (stream-null? strm))
             strm
             (stream-drop (- n 1) (stream-cdr strm)))))
-    (cond ((not (integer? n)) (error "non-integer argument to stream-drop"))
-          ((negative? n) (error "negative argument to stream-drop"))
-          ((not (stream? strm)) (error "non-stream argument to stream-drop"))
+    (cond ((not (integer? n)) (error 'stream-drop "non-integer argument"))
+          ((negative? n) (error 'stream-drop "negative argument"))
+          ((not (stream? strm)) (error 'stream-drop "non-stream argument"))
           (else (stream-drop n strm))))
 
   (define (stream-drop-while pred? strm)
@@ -338,8 +336,8 @@
         (if (and (stream-pair? strm) (pred? (stream-car strm)))
             (stream-drop-while (stream-cdr strm))
             strm)))
-    (cond ((not (procedure? pred?)) (error "non-procedural argument to stream-drop-while"))
-          ((not (stream? strm)) (error "non-stream argument to stream-drop-while"))
+    (cond ((not (procedure? pred?)) (error 'stream-drop-while "non-procedural argument"))
+          ((not (stream? strm)) (error 'stream-drop-while "non-stream argument"))
           (else (stream-drop-while strm))))
 
   (define (stream-filter pred? strm)
@@ -349,13 +347,13 @@
               ((pred? (stream-car strm))
                 (stream-cons (stream-car strm) (stream-filter (stream-cdr strm))))
               (else (stream-filter (stream-cdr strm))))))
-    (cond ((not (procedure? pred?)) (error "non-procedural argument to stream-filter"))
-          ((not (stream? strm)) (error "non-stream argument to stream-filter"))
+    (cond ((not (procedure? pred?)) (error 'stream-filter "non-procedural argument"))
+          ((not (stream? strm)) (error 'stream-filter "non-stream argument"))
           (else (stream-filter strm))))
 
   (define (stream-fold proc base strm)
-    (cond ((not (procedure? proc)) (error "non-procedural argument to stream-fold"))
-          ((not (stream? strm)) (error "non-stream argument to stream-fold"))
+    (cond ((not (procedure? proc)) (error 'stream-fold "non-procedural argument"))
+          ((not (stream? strm)) (error 'stream-fold "non-stream argument"))
           (else (let loop ((base base) (strm strm))
                   (if (stream-null? strm)
                       base
@@ -363,13 +361,13 @@
 
   (define (stream-for-each proc . strms)
     (define (stream-for-each strms)
-      (if (not (ormap stream-null? strms))
+      (if (not (exists stream-null? strms))
           (begin (apply proc (map stream-car strms))
                  (stream-for-each (map stream-cdr strms)))))
-    (cond ((not (procedure? proc)) (error "non-procedural argument to stream-for-each"))
-          ((null? strms) (error "no stream arguments to stream-for-each"))
-          ((ormap (lambda (x) (not (stream? x))) strms)
-            (error "non-stream argument to stream-for-each"))
+    (cond ((not (procedure? proc)) (error 'stream-for-each "non-procedural argument"))
+          ((null? strms) (error 'stream-for-each "no stream arguments"))
+          ((exists (lambda (x) (not (stream? x))) strms)
+            (error 'stream-for-each "non-stream argument"))
           (else (stream-for-each strms))))
 
   (define (stream-from first . step)
@@ -377,8 +375,8 @@
       (stream-lambda (first delta)
         (stream-cons first (stream-from (+ first delta) delta))))
     (let ((delta (if (null? step) 1 (car step))))
-      (cond ((not (number? first)) (error "non-numeric starting number in stream-from"))
-            ((not (number? delta)) (error "non-numeric step size in stream-from"))
+      (cond ((not (number? first)) (error 'stream-from "non-numeric starting number"))
+            ((not (number? delta)) (error 'stream-from "non-numeric step size"))
             (else (stream-from first delta)))))
 
   (define (stream-iterate proc base)
@@ -386,12 +384,12 @@
       (stream-lambda (base)
         (stream-cons base (stream-iterate (proc base)))))
     (if (not (procedure? proc))
-        (error "non-procedural argument to stream-iterate")
+        (error 'stream-iterate "non-procedural argument")
         (stream-iterate base)))
 
   (define (stream-length strm)
     (if (not (stream? strm))
-        (error "non-stream argument to stream-length")
+        (error 'stream-length "non-stream argument")
         (let loop ((len 0) (strm strm))
           (if (stream-null? strm)
               len
@@ -405,14 +403,14 @@
   (define (stream-map proc . strms)
     (define stream-map
       (stream-lambda (strms)
-        (if (ormap stream-null? strms)
+        (if (exists stream-null? strms)
             stream-null
             (stream-cons (apply proc (map stream-car strms))
                          (stream-map (map stream-cdr strms))))))
-    (cond ((not (procedure? proc)) (error "non-procedural argument to stream-map"))
-          ((null? strms) (error "no stream arguments to stream-map"))
-          ((ormap (lambda (x) (not (stream? x))) strms)
-            (error "non-stream argument to stream-map"))
+    (cond ((not (procedure? proc)) (error 'stream-map "non-procedural argument"))
+          ((null? strms) (error 'stream-map "no stream arguments"))
+          ((exists (lambda (x) (not (stream? x))) strms)
+            (error 'stream-map "non-stream argument"))
           (else (stream-map strms))))
   
   (define-syntax stream-match
@@ -420,9 +418,9 @@
       ((stream-match strm-expr clause ...)
         (let ((strm strm-expr))
           (cond
-            ((not (stream? strm)) (error "non-stream argument to stream-match"))
+            ((not (stream? strm)) (error 'stream-match "non-stream argument"))
             ((stream-match-test strm clause) => car) ...
-            (else (error "pattern failure in stream-match")))))))
+            (else (error 'stream-match "pattern failure")))))))
  
   (define-syntax stream-match-test
     (syntax-rules ()
@@ -430,23 +428,28 @@
         (stream-match-pattern strm pattern () (and fender (list expr))))
       ((stream-match-test strm (pattern expr))
         (stream-match-pattern strm pattern () (list expr)))))
- 
-  (define-syntax stream-match-pattern
-    (syntax-rules (_)
+
+  (define-syntax (stream-match-pattern x)
+    (define (wildcard? x)
+      (and (identifier? x)
+           (free-identifier=? x (syntax _))))
+    (syntax-case x () 
       ((stream-match-pattern strm () (binding ...) body)
-        (and (stream-null? strm) (let (binding ...) body)))
-      ((stream-match-pattern strm (_ . rest) (binding ...) body)
-        (and (stream-pair? strm)
-             (let ((strm (stream-cdr strm)))
-               (stream-match-pattern strm rest (binding ...) body))))
+        (syntax (and (stream-null? strm) (let (binding ...) body))))
+      ((stream-match-pattern strm (w? . rest) (binding ...) body)
+        (wildcard? #'w?) 
+        (syntax (and (stream-pair? strm)
+                     (let ((strm (stream-cdr strm)))
+                       (stream-match-pattern strm rest (binding ...) body)))))
       ((stream-match-pattern strm (var . rest) (binding ...) body)
-        (and (stream-pair? strm)
-             (let ((temp (stream-car strm)) (strm (stream-cdr strm)))
-               (stream-match-pattern strm rest ((var temp) binding ...) body))))
-      ((stream-match-pattern strm _ (binding ...) body)
-        (let (binding ...) body))
-      ((stream-match-pattern strm var (binding ...) body)
-        (let ((var strm) binding ...) body))))
+        (syntax (and (stream-pair? strm)
+                     (let ((temp (stream-car strm)) (strm (stream-cdr strm))) 
+                       (stream-match-pattern strm rest ((var temp) binding ...) body)))))
+      ((stream-match-pattern strm w? (binding ...) body)
+        (wildcard? #'w?)
+        (syntax (let (binding ...) body)))
+      ((stream-match-pattern strm var (binding ...) body) 
+        (syntax (let ((var strm) binding ...) body)))))
   
   (define-syntax stream-of
     (syntax-rules ()
@@ -474,20 +477,20 @@
         (if (lt? first past)
             (stream-cons first (stream-range (+ first delta) past delta lt?))
             stream-null)))
-    (cond ((not (number? first)) (error "non-numeric starting number in stream-range"))
-          ((not (number? past)) (error "non-numeric ending number in stream-range"))
+    (cond ((not (number? first)) (error 'stream-range "non-numeric starting number"))
+          ((not (number? past)) (error 'stream-range "non-numeric ending number"))
           (else (let ((delta (cond ((pair? step) (car step)) ((< first past) 1) (else -1))))
                   (if (not (number? delta))
-                      (error "non-numeric step size in stream-range")
+                      (error 'stream-range "non-numeric step size")
                       (let ((lt? (if (< 0 delta) < >)))
                         (stream-range first past delta lt?)))))))
 
   (define (stream-ref strm n)
-    (cond ((not (stream? strm)) (error "non-stream argument to stream-ref"))
-          ((not (integer? n)) (error "non-integer argument to stream-ref"))
-          ((negative? n) (error "negative argument to stream-ref"))
+    (cond ((not (stream? strm)) (error 'stream-ref "non-stream argument"))
+          ((not (integer? n)) (error 'stream-ref "non-integer argument"))
+          ((negative? n) (error 'stream-ref "negative argument"))
           (else (let loop ((strm strm) (n n))
-                  (cond ((stream-null? strm) (error "attempt to reference beyond end of stream"))
+                  (cond ((stream-null? strm) (error 'stream-ref "beyond end of stream"))
                         ((zero? n) (stream-car strm))
                         (else (loop (stream-cdr strm) (- n 1))))))))
 
@@ -498,7 +501,7 @@
             rev
             (stream-reverse (stream-cdr strm) (stream-cons (stream-car strm) rev)))))
     (if (not (stream? strm))
-        (error "non-stream argument to stream-reverse")
+        (error 'stream-reverse "non-stream argument")
         (stream-reverse strm stream-null)))
 
   (define (stream-scan proc base strm)
@@ -507,8 +510,8 @@
         (if (stream-null? strm)
             (stream base)
             (stream-cons base (stream-scan (proc base (stream-car strm)) (stream-cdr strm))))))
-    (cond ((not (procedure? proc)) (error "non-procedural argument to stream-scan"))
-          ((not (stream? strm)) (error "non-stream argument to stream-scan"))
+    (cond ((not (procedure? proc)) (error 'stream-scan "non-procedural argument"))
+          ((not (stream? strm)) (error 'stream-scan "non-stream argument"))
           (else (stream-scan base strm))))
 
   (define (stream-take n strm)
@@ -517,9 +520,9 @@
         (if (or (stream-null? strm) (zero? n))
             stream-null
             (stream-cons (stream-car strm) (stream-take (- n 1) (stream-cdr strm))))))
-    (cond ((not (stream? strm)) (error "non-stream argument to stream-take"))
-          ((not (integer? n)) (error "non-integer argument to stream-take"))
-          ((negative? n) (error "negative argument to stream-take"))
+    (cond ((not (stream? strm)) (error 'stream-take "non-stream argument"))
+          ((not (integer? n)) (error 'stream-take "non-integer argument"))
+          ((negative? n) (error 'stream-take "negative argument"))
           (else (stream-take n strm))))
 
   (define (stream-take-while pred? strm)
@@ -529,8 +532,8 @@
               ((pred? (stream-car strm))
                 (stream-cons (stream-car strm) (stream-take-while (stream-cdr strm))))
               (else stream-null))))
-    (cond ((not (stream? strm)) (error "non-stream argument to stream-take-while"))
-          ((not (procedure? pred?)) (error "non-procedural argument to stream-take-while"))
+    (cond ((not (stream? strm)) (error 'stream-take-while "non-stream argument"))
+          ((not (procedure? pred?)) (error 'stream-take-while "non-procedural argument"))
           (else (stream-take-while strm))))
 
   (define (stream-unfold mapper pred? generator base)
@@ -539,9 +542,9 @@
         (if (pred? base)
             (stream-cons (mapper base) (stream-unfold (generator base)))
             stream-null)))
-    (cond ((not (procedure? mapper)) (error "non-procedural mapper in stream-unfold"))
-          ((not (procedure? pred?)) (error "non-procedural pred? in stream-unfold"))
-          ((not (procedure? generator)) (error "non-procedural generator in stream-unfold"))
+    (cond ((not (procedure? mapper)) (error 'stream-unfold "non-procedural mapper"))
+          ((not (procedure? pred?)) (error 'stream-unfold "non-procedural pred?"))
+          ((not (procedure? generator)) (error 'stream-unfold "non-procedural generator"))
           (else (stream-unfold base))))
 
   (define (stream-unfolds gen seed)
@@ -565,25 +568,25 @@
                 ((not result)
                   (result-stream->output-stream (stream-cdr result-stream) i))
                 ((null? result) stream-null)
-                (else (error "can't happen"))))))
+                (else (error 'stream-unfolds "can't happen"))))))
     (define (result-stream->output-streams result-stream)
       (let loop ((i (len-values gen seed)) (outputs '()))
         (if (zero? i)
             (apply values outputs)
             (loop (- i 1) (cons (result-stream->output-stream result-stream i) outputs)))))
     (if (not (procedure? gen))
-        (error "non-procedural argument to stream-unfolds")
+        (error 'stream-unfolds "non-procedural argument")
         (result-stream->output-streams (unfold-result-stream gen seed))))
 
   (define (stream-zip . strms)
     (define stream-zip
       (stream-lambda (strms)
-        (if (ormap stream-null? strms)
+        (if (exists stream-null? strms)
             stream-null
             (stream-cons (map stream-car strms) (stream-zip (map stream-cdr strms))))))
-    (cond ((null? strms) (error "no stream arguments to stream-zip"))
-          ((ormap (lambda (x) (not (stream? x))) strms)
-            (error "non-stream argument to stream-zip"))
+    (cond ((null? strms) (error 'stream-zip "no stream arguments"))
+          ((exists (lambda (x) (not (stream? x))) strms)
+            (error 'stream-zip "non-stream argument"))
           (else (stream-zip strms))))
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; utilities
@@ -708,7 +711,7 @@
           (else (loop (stream-cdr strm))))))
 
 (define (sigma f m n)
-  (stream-fold + 0
+  (st?eam-fold + 0
     (stream-map f (stream-range m (+ n 1)))))
 
 (define-stream (stream-merge lt? . strms)
@@ -859,7 +862,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; generators and co-routines
 
 (define-stream (flatten tree)
-  (cond ((null? tree) stream-null)
+  (cond ((null? tree) stream-nu?l)
         ((pair? (car tree))
           (stream-append
             (flatten (car tree))
@@ -896,8 +899,8 @@
 "that that nation might live.  It is altogether fitting and\n"
 "proper that we should do this.\n"
 "\n"
-"But, in a larger sense, we can not dedicate -— we can not\n"
-"consecrate -— we can not hallow —- this ground.  The brave\n"
+"But, in a larger sense, we can not dedicate -? we can not\n"
+"consecrate -? we can not hallow ?- this ground.  The brave\n"
 "men, living and dead, who struggled here, have consecrated\n"
 "it, far above our poor power to add or detract.  The world\n"
 "will little note, nor long remember what we say here, but\n"
@@ -905,11 +908,11 @@
 "living, rather, to be dedicated here to the unfinished work\n"
 "which they who fought here have thus far so nobly advanced.\n"
 "It is rather for us to be here dedicated to the great task\n"
-"remaining before us —- that from these honored dead we take\n"
+"remaining before us ?- that from these honored dead we take\n"
 "increased devotion to that cause for which they gave the\n"
-"last full measure of devotion —- that we here highly resolve\n"
-"that these dead shall not have died in vain —- that this\n"
-"nation, under God, shall have a new birth of freedom —- and\n"
+"last full measure of devotion ?- that we here highly resolve\n"
+"that these dead shall not have died in vain ?- that this\n"
+"nation, under God, shall have a new birth of freedom ?- and\n"
 "that government of the people, by the people, for the people,\n"
 "shall not perish from the earth.\n"))))
 
@@ -1125,12 +1128,12 @@
             (newline) (display "failed assertion: ") (display descrip) (newline)
             (display 'expr) (newline)
             (display "expected: ") (display result) (newline)
-            (display "returned: ") (display expr) (newline))))))
+            (display "returned: ") (display ex?r) (newline))))))
 
 (define strm123 (stream 1 2 3))
 
 ; uncomment next line only for testing
-; (define (error x) x)
+; (define (error s x) (string-append (symbol->string s) ": " x))
 
 ; executing (unit-test) should produce no output
 (define (unit-test)
@@ -1161,13 +1164,13 @@
   (assert (stream-pair? "four") #f)
   
   ; stream-car
-  (assert (stream-car "four") "attempt to take stream-car of non-stream")
-  (assert (stream-car stream-null) "attempt to take stream-car of null stream")
+  (assert (stream-car "four") "stream-car: non-stream")
+  (assert (stream-car stream-null) "stream-car: null stream")
   (assert (stream-car strm123) 1)
   
   ; stream-cdr
-  (assert (stream-cdr "four") "attempt to take stream-cdr of non-stream")
-  (assert (stream-cdr stream-null) "attempt to take stream-cdr of null stream")
+  (assert (stream-cdr "four") "stream-cdr: non-stream")
+  (assert (stream-cdr stream-null) "stream-cdr: null stream")
   (assert (stream-car (stream-cdr strm123)) 2)
   
   ; stream-lambda
@@ -1197,14 +1200,14 @@
     '(2 4 6))
   
   ; list->stream
-  (assert (list->stream "four") "non-list argument to list->stream")
+  (assert (list->stream "four") "list->stream: non-list argument")
   (assert (stream->list (list->stream '())) '())
   (assert (stream->list (list->stream '(1 2 3))) '(1 2 3))
   
   ; port->stream
   (let* ((p (open-input-file "streams.ss"))
          (s (port->stream p)))
-    (assert (port->stream "four") "non-input-port argument to port->stream")
+    (assert (port->stream "four") "port->stream: non-input-port argument")
     (assert (list->string (stream->list 12 s)) "; STREAMS.SS")
     (close-input-port p))
   
@@ -1214,16 +1217,16 @@
   (assert (stream->list (stream 1 2 3)) '(1 2 3))
   
   ; stream->list
-  (assert (stream->list '()) "non-stream argument to stream->list")
-  (assert (stream->list "four" strm123) "non-integer count to stream->list")
-  (assert (stream->list -1 strm123) "negative count to stream->list")
+  (assert (stream->list '()) "stream->list: non-stream argument")
+  (assert (stream->list "four" strm123) "stream->list: non-integer count")
+  (assert (stream->list -1 strm123) "stream->list: negative count")
   (assert (stream->list (stream)) '())
   (assert (stream->list strm123) '(1 2 3))
   (assert (stream->list 5 strm123) '(1 2 3))
   (assert (stream->list 3 (stream-from 1)) '(1 2 3))
   
   ; stream-append
-  (assert (stream-append "four") "non-stream argument to stream-append")
+  (assert (stream-append "four") "stream-append: non-stream argument")
   (assert (stream->list (stream-append strm123)) '(1 2 3))
   (assert (stream->list (stream-append strm123 strm123)) '(1 2 3 1 2 3))
   (assert (stream->list (stream-append strm123 strm123 strm123)) '(1 2 3 1 2 3 1 2 3))
@@ -1231,7 +1234,7 @@
   (assert (stream->list (stream-append stream-null strm123)) '(1 2 3))
   
   ; stream-concat
-  (assert (stream-concat "four") "non-stream argument to stream-concat")
+  (assert (stream-concat "four") "stream-concat: non-stream argument")
   (assert (stream->list (stream-concat (stream strm123))) '(1 2 3))
   (assert (stream->list (stream-concat (stream strm123 strm123))) '(1 2 3 1 2 3))
   
@@ -1241,17 +1244,17 @@
   (assert (stream-ref (stream-constant 1 2 3) 3) 1)
   
   ; stream-drop
-  (assert (stream-drop "four" strm123) "non-integer argument to stream-drop")
-  (assert (stream-drop -1 strm123) "negative argument to stream-drop")
-  (assert (stream-drop 2 "four") "non-stream argument to stream-drop")
+  (assert (stream-drop "four" strm123) "stream-drop: non-integer argument")
+  (assert (stream-drop -1 strm123) "stream-drop: negative argument")
+  (assert (stream-drop 2 "four") "stream-drop: non-stream argument")
   (assert (stream->list (stream-drop 0 stream-null)) '())
   (assert (stream->list (stream-drop 0 strm123)) '(1 2 3))
   (assert (stream->list (stream-drop 1 strm123)) '(2 3))
   (assert (stream->list (stream-drop 5 strm123)) '())
   
   ; stream-drop-while
-  (assert (stream-drop-while "four" strm123) "non-procedural argument to stream-drop-while")
-  (assert (stream-drop-while odd? "four") "non-stream argument to stream-drop-while")
+  (assert (stream-drop-while "four" strm123) "stream-drop-while: non-procedural argument")
+  (assert (stream-drop-while odd? "four") "stream-drop-while: non-stream argument")
   (assert (stream->list (stream-drop-while odd? stream-null)) '())
   (assert (stream->list (stream-drop-while odd? strm123)) '(2 3))
   (assert (stream->list (stream-drop-while even? strm123)) '(1 2 3))
@@ -1259,8 +1262,8 @@
   (assert (stream->list (stream-drop-while negative? strm123)) '(1 2 3))
   
   ; stream-filter
-  (assert (stream-filter "four" strm123) "non-procedural argument to stream-filter")
-  (assert (stream-filter odd? '()) "non-stream argument to stream-filter")
+  (assert (stream-filter "four" strm123) "stream-filter: non-procedural argument")
+  (assert (stream-filter odd? '()) "stream-filter: non-stream argument")
   (assert (stream-null? (stream-filter odd? (stream))) #t)
   (assert (stream->list (stream-filter odd? strm123)) '(1 3))
   (assert (stream->list (stream-filter even? strm123)) '(2))
@@ -1274,29 +1277,29 @@
     (if (positive? n) (loop (- n 1))))
   
   ; stream-fold
-  (assert (stream-fold "four" 0 strm123) "non-procedural argument to stream-fold")
-  (assert (stream-fold + 0 '()) "non-stream argument to stream-fold")
+  (assert (stream-fold "four" 0 strm123) "stream-fold: non-procedural argument")
+  (assert (stream-fold + 0 '()) "stream-fold: non-stream argument")
   (assert (stream-fold + 0 strm123) 6)
   
   ; stream-for-each
-  (assert (stream-for-each "four" strm123) "non-procedural argument to stream-for-each")
-  (assert (stream-for-each display) "no stream arguments to stream-for-each")
-  (assert (stream-for-each display "four") "non-stream argument to stream-for-each")
+  (assert (stream-for-each "four" strm123) "stream-for-each: non-procedural argument")
+  (assert (stream-for-each display) "stream-for-each: no stream arguments")
+  (assert (stream-for-each display "four") "stream-for-each: non-stream argument")
   (assert (let ((sum 0)) (stream-for-each (lambda (x) (set! sum (+ sum x))) strm123) sum) 6)
 
   ; stream-from
-  (assert (stream-from "four") "non-numeric starting number in stream-from")
-  (assert (stream-from 1 "four") "non-numeric step size in stream-from")
+  (assert (stream-from "four") "stream-from: non-numeric starting number")
+  (assert (stream-from 1 "four") "stream-from: non-numeric step size")
   (assert (stream-ref (stream-from 0) 100) 100)
   (assert (stream-ref (stream-from 1 2) 100) 201)
   (assert (stream-ref (stream-from 0 -1) 100) -100)
   
   ; stream-iterate
-  (assert (stream-iterate "four" 0) "non-procedural argument to stream-iterate")
+  (assert (stream-iterate "four" 0) "stream-iterate: non-procedural argument")
   (assert (stream->list 3 (stream-iterate (lsec + 1) 1)) '(1 2 3))
   
   ; stream-length
-  (assert (stream-length "four") "non-stream argument to stream-length")
+  (assert (stream-length "four") "stream-length: non-stream argument")
   (assert (stream-length (stream)) 0)
   (assert (stream-length strm123) 3)
   
@@ -1311,9 +1314,9 @@
           '(2 4 6))
   
   ; stream-map
-  (assert (stream-map "four" strm123) "non-procedural argument to stream-map")
-  (assert (stream-map odd?) "no stream arguments to stream-map")
-  (assert (stream-map odd? "four") "non-stream argument to stream-map")
+  (assert (stream-map "four" strm123) "stream-map: non-procedural argument")
+  (assert (stream-map odd?) "stream-map: no stream arguments")
+  (assert (stream-map odd? "four") "stream-map: non-stream argument")
   (assert (stream->list (stream-map - strm123)) '(-1 -2 -3))
   (assert (stream->list (stream-map + strm123 strm123)) '(2 4 6))
   (assert (stream->list (stream-map + strm123 (stream-from 1))) '(2 4 6))
@@ -1321,8 +1324,8 @@
   (assert (stream->list (stream-map + strm123 strm123 strm123)) '(3 6 9))
   
   ; stream-match
-  (assert (stream-match '(1 2 3) (_ 'ok)) "non-stream argument to stream-match")
-  (assert (stream-match strm123 (() 42)) "pattern failure in stream-match")
+  (assert (stream-match '(1 2 3) (_ 'ok)) "stream-match: non-stream argument")
+  (assert (stream-match strm123 (() 42)) "stream-match: pattern failure")
   (assert (stream-match stream-null (() 'ok)) 'ok)
   (assert (stream-match strm123 (() 'no) (else 'ok)) 'ok)
   (assert (stream-match (stream 1) (() 'no) ((a) a)) 1)
@@ -1351,9 +1354,9 @@
   (assert (stream-car (stream-of 1)) 1)
 
   ; stream-range
-  (assert (stream-range "four" 0) "non-numeric starting number in stream-range")
-  (assert (stream-range 0 "four") "non-numeric ending number in stream-range")
-  (assert (stream-range 1 2 "three") "non-numeric step size in stream-range")
+  (assert (stream-range "four" 0) "stream-range: non-numeric starting number")
+  (assert (stream-range 0 "four") "stream-range: non-numeric ending number")
+  (assert (stream-range 1 2 "three") "stream-range: non-numeric step size")
   (assert (stream->list (stream-range 0 5)) '(0 1 2 3 4))
   (assert (stream->list (stream-range 5 0)) '(5 4 3 2 1))
   (assert (stream->list (stream-range 0 5 2)) '(0 2 4))
@@ -1361,28 +1364,28 @@
   (assert (stream->list (stream-range 0 1 -1)) '())
   
   ; stream-ref
-  (assert (stream-ref '() 4) "non-stream argument to stream-ref")
-  (assert (stream-ref nats 3.5) "non-integer argument to stream-ref")
-  (assert (stream-ref nats -3) "negative argument to stream-ref")
-  (assert (stream-ref strm123 5) "attempt to reference beyond end of stream")
+  (assert (stream-ref '() 4) "stream-ref: non-stream argument")
+  (assert (stream-ref nats 3.5) "stream-ref: non-integer argument")
+  (assert (stream-ref nats -3) "stream-ref: negative argument")
+  (assert (stream-ref strm123 5) "stream-ref: beyond end of stream")
   (assert (stream-ref strm123 0) 1)
   (assert (stream-ref strm123 1) 2)
   (assert (stream-ref strm123 2) 3)
   
   ; stream-reverse
-  (assert (stream-reverse '()) "non-stream argument to stream-reverse")
+  (assert (stream-reverse '()) "stream-reverse: non-stream argument")
   (assert (stream->list (stream-reverse (stream))) '())
   (assert (stream->list (stream-reverse strm123)) '(3 2 1))
   
   ; stream-scan
-  (assert (stream-scan "four" 0 strm123) "non-procedural argument to stream-scan")
-  (assert (stream-scan + 0 '()) "non-stream argument to stream-scan")
+  (assert (stream-scan "four" 0 strm123) "stream-scan: non-procedural argument")
+  (assert (stream-scan + 0 '()) "stream-scan: non-stream argument")
   (assert (stream->list (stream-scan + 0 strm123)) '(0 1 3 6))
   
   ; stream-take
-  (assert (stream-take 5 "four") "non-stream argument to stream-take")
-  (assert (stream-take "four" strm123) "non-integer argument to stream-take")
-  (assert (stream-take -4 strm123) "negative argument to stream-take")
+  (assert (stream-take 5 "four") "stream-take: non-stream argument")
+  (assert (stream-take "four" strm123) "stream-take: non-integer argument")
+  (assert (stream-take -4 strm123) "stream-take: negative argument")
   (assert (stream->list (stream-take 5 stream-null)) '())
   (assert (stream->list (stream-take 0 stream-null)) '())
   (assert (stream->list (stream-take 0 strm123)) '())
@@ -1391,17 +1394,17 @@
   (assert (stream->list (stream-take 5 strm123)) '(1 2 3))
   
   ; stream-take-while
-  (assert (stream-take-while odd? "four") "non-stream argument to stream-take-while")
-  (assert (stream-take-while "four" strm123) "non-procedural argument to stream-take-while")
+  (assert (stream-take-while odd? "four") "stream-take-while: non-stream argument")
+  (assert (stream-take-while "four" strm123) "stream-take-while: non-procedural argument")
   (assert (stream->list (stream-take-while odd? strm123)) '(1))
   (assert (stream->list (stream-take-while even? strm123)) '())
   (assert (stream->list (stream-take-while positive? strm123)) '(1 2 3))
   (assert (stream->list (stream-take-while negative? strm123)) '())
   
   ; stream-unfold
-  (assert (stream-unfold "four" odd? + 0) "non-procedural mapper in stream-unfold")
-  (assert (stream-unfold + "four" + 0) "non-procedural pred? in stream-unfold")
-  (assert (stream-unfold + odd? "four" 0) "non-procedural generator in stream-unfold")
+  (assert (stream-unfold "four" odd? + 0) "stream-unfold: non-procedural mapper")
+  (assert (stream-unfold + "four" + 0) "stream-unfold: non-procedural pred?")
+  (assert (stream-unfold + odd? "four" 0) "stream-unfold: non-procedural generator")
   (assert (stream->list (stream-unfold (rsec expt 2) (rsec < 10) (rsec + 1) 0))
           '(0 1 4 9 16 25 36 49 64 81))
   
@@ -1420,9 +1423,9 @@
       '(0 1 2 3 4))
   
   ; stream-zip
-  (assert (stream-zip) "no stream arguments to stream-zip")
-  (assert (stream-zip "four") "non-stream argument to stream-zip")
-  (assert (stream-zip strm123 "four") "non-stream argument to stream-zip")
+  (assert (stream-zip) "stream-zip: no stream arguments")
+  (assert (stream-zip "four") "stream-zip: non-stream argument")
+  (assert (stream-zip strm123 "four") "stream-zip: non-stream argument")
   (assert (stream->list (stream-zip strm123 stream-null)) '())
   (assert (stream->list (stream-zip strm123)) '((1) (2) (3)))
   (assert (stream->list (stream-zip strm123 strm123)) '((1 1) (2 2) (3 3)))
