@@ -217,7 +217,7 @@
   (define-syntax stream-cons
     (syntax-rules ()
       ((stream-cons obj strm)
-        (stream-delay (make-stream-pare (stream-delay obj) (stream-lazy strm))))))
+        (stream-eager (make-stream-pare (stream-delay obj) (stream-lazy strm))))))
 
   (define (stream-car strm)
     (cond ((not (stream? strm)) (error 'stream-car "non-stream"))
