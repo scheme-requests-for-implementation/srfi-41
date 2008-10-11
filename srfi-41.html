@@ -40,7 +40,7 @@ the archive of the mailing list</a>.
 <LI>Final: <a href="http://srfi.schemers.org/cgi-bin/viewcvs.cgi/*checkout*/srfi/srfi-41/srfi-41.html?rev=1.7">2008/01/24</a>
 <LI>Draft: 2007/10/21 - 2007/12/22
 </UL>
-  
+
 <H1>Abstract</H1>
 
 <p align="justify"><font face="serif">Streams, sometimes 
@@ -702,12 +702,13 @@ because unnamed </font><font face="monospace">stream-let</font><font face="serif
 
 <p align="justify"><font face="monospace">Stream-member</font><font face="serif"> returns the first stream-pair of the 
 input </font><font face="monospace">strm</font><font face="serif"> 
-with a </font><font face="monospace">stream-car</font><font face="serif"> <i>x</i> that satisfies </font><font face="monospace">(eql? obj </font><font face="serif"><i>x</i></font><font face="monospace">)</font><font face="serif">.</font></p>
+with a </font><font face="monospace">stream-car</font><font face="serif"> <i>x</i> that satisfies </font><font face="monospace">(eql? obj </font><font face="serif"><i>x</i></font><font face="monospace">)</font><font face="serif">,
+or the null stream if <i>x</i> is not present in </font><font face="monospace">strm</font><font face="serif">.</font></p>
 
 <p align="justify"><font face="monospace"><pre>
 (define-stream (stream-member eql? obj strm)
   (stream-let loop ((strm strm))
-    (cond ((stream-null? strm) #f)
+    (cond ((stream-null? strm) strm)
           ((eql? obj (stream-car strm)) strm)
           (else (loop (stream-cdr strm))))))</pre></font></p>
 
@@ -2875,18 +2876,18 @@ DEALINGS IN THE SOFTWARE.</p>
 available from</font>
 <font face="monospace">srfi.schemers.org/srfi-41</font><font face="serif">:
 A version of this document suitable for printing is available at</font>
-<font face="monospace"><a href="streams.pdf">streams.pdf</a></font><font face="serif">.
+<font face="monospace"<a href="streams.pdf">streams.pdf</a></font><font face="serif">.
 The complete source corresponding to the three Appendices is available in files</font>
-<font face="monospace"><a href="streams.ss">streams.ss</a></font><font face="serif">,
-</font><font face="monospace"><a href="primitive.ss">primitive.ss</a></font><font face="serif">, and
-</font><font face="monospace"><a href="derived.ss">derived.ss</a></font><font face="serif">.
+<font face="monospace"<a href="streams.ss">streams.ss</a></font><font face="serif">,
+</font><font face="monospace"<a href="primitive.ss">primitive.ss</a></font><font face="serif">, and
+</font><font face="monospace"<a href="derived.ss">derived.ss</a></font><font face="serif">.
 Samples from the text are available at
-</font><font face="monospace"><a href="samples.ss">samples.ss</a></font><font face="serif">,
+</font><font face="monospace"<a href="samples.ss">samples.ss</a></font><font face="serif">,
 and a test suite is available at</font>
-<font face="monospace"><a href="r6rs-test.ss">r6rs-test.ss</a></font><font face="serif">.
+<font face="monospace"<a href="r6rs-test.ss">r6rs-test.ss</a></font><font face="serif">.
 Source code and tests for R5RS are available at</font>
-<font face="monospace"><a href="r5rs.ss">r5rs.ss</a></font><font face="serif">,
-and</font> <font face="monospace"><a href="r5rs-test.ss">r5rs-test.ss</a></font><font face="serif">.</font></p>
+<font face="monospace"<a href="r5rs.ss">r5rs.ss</a></font><font face="serif">,
+and</font> <font face="monospace"<a href="r5rs-test.ss">r5rs-test.ss</a></font><font face="serif">.</font></p>
 
 <hr>
 <address>Editor: <a href="mailto:srfi-editors at srfi dot schemers dot org">Michael Sperber</a></address>
