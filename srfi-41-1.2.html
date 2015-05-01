@@ -1,0 +1,2866 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <title>SRFI 41: Streams</title>
+  </head>
+
+  <body>
+
+<H1>Title</H1>
+
+Streams
+
+
+<H1>Author</H1>
+
+Philip L. Bewig
+
+<H1>Status</H1>
+
+This SRFI is currently in ``draft'' status. To see an explanation of each
+status that a SRFI can hold, see
+<a HREF="http://srfi.schemers.org/srfi-process.html">here</a>.
+It will remain in draft status until 2007/12/22, or as amended. To
+provide input on this SRFI, please <CODE>
+<a HREF="mailto:srfi-41 at srfi dot schemers dot org">mailto:srfi minus 41 at srfi dot schemers dot org</a></CODE>.
+See <a HREF="../../srfi-list-subscribe.html">instructions
+here</a> to subscribe to the list. You can access previous messages via
+<a HREF="http://srfi.schemers.org/srfi-41/mail-archive/maillist.html">the
+archive of the mailing list</a>.
+
+<UL>
+<LI>Received: <a href="srfi-41-1.2.html">2007/10/24</a>
+<LI>Draft: 2007/10/21 - 2007/12/22
+</UL>
+
+<H1>Abstract</H1>
+
+<p align="justify"><font size="2" face="Times New Roman">Streams, sometimes 
+called lazy lists, are a sequential data structure containing elements 
+computed only on demand.  A stream is either null or is a pair 
+with a stream in its cdr.  Since elements of a stream are computed 
+only when accessed, streams can be infinite.  Once computed, the 
+value of a stream element is cached in case it is needed again.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Streams without 
+memoization were first described by Peter Landin in 1965.  Memoization 
+became accepted as an essential feature of streams about a decade later.  
+Today, streams are the signature data type of functional programming 
+languages such as Haskell.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">This Scheme Request for Implementation describes 
+two libraries for operating on streams: a canonical set of stream primitives
+and a set of procedures and syntax derived from those primitives that permits
+convenient expression of stream operations. They rely on facilities provided
+by R6RS, including libraries, records, and error reporting.</font></p>
+
+<H1>Rationale</H1>
+
+<p align="justify"><font size="2" face="Times New Roman">Harold Abelson 
+and Gerald Jay Sussman discuss streams at length, giving a strong justification 
+for their use.  The streams they provide are represented as a </font><font size="2" face="Courier New">cons</font><font size="2" face="Times New Roman"> 
+pair with a promise to return a stream in its </font><font size="2" face="Courier New">cdr</font><font size="2" face="Times New Roman">; for instance, a stream with elements 
+the first three counting numbers is represented conceptually as </font><font size="2" face="Courier New">(cons 1 (delay (cons 2 (delay (cons 3 (delay 
+&#39;()))))))</font><font size="2" face="Times New Roman">.</font><font size="2" face="Courier New">  </font><font size="2" face="Times New Roman">Philip Wadler, Walid Taha and David 
+MacQueen describe such streams as <i>odd</i> because, regardless of 
+their length, the parity of the number of constructors (</font><font size="2" face="Courier New">delay</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">cons</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">&#39;()</font><font size="2" face="Times New Roman">) 
+in the stream is odd.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The streams 
+provided in this note differ from those of Abelson and Sussman, being 
+represented as promises that contain a </font><font size="2" face="Courier New">cons</font><font size="2" face="Times New Roman"> pair with a stream in its </font><font size="2" face="Courier New">cdr</font><font size="2" face="Times New Roman">; 
+for instance, the stream with elements the first three counting numbers 
+is represented conceptually as </font><font size="2" face="Courier New">(delay 
+(cons 1 (delay (cons 2 (delay (cons 3 (delay &#39;())))))))</font><font size="2" face="Times New Roman">; 
+this is an <i>even</i> stream because the parity of the number of constructors 
+in the stream is even.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Even streams 
+are more complex than odd streams in both definition and usage, but 
+they offer a strong benefit: they fix the off-by-one error of odd streams.  
+Wadler, Taha and MacQueen show, for instance, that an expression like </font><font size="2" face="Courier New">(stream-&gt;list 4 (stream-map / (stream-from 
+4 -1))) </font><font size="2" face="Times New Roman">evaluates to </font><font size="2" face="Courier New">(1/4 1/3 1/2 1)</font><font size="2" face="Times New Roman"> 
+using even streams but fails with a divide-by-zero error using odd streams, 
+because the next element in the stream, which will be </font><font size="2" face="Courier New">1/0</font><font size="2" face="Times New Roman">, is evaluated before it is accessed.  
+This extra bit of laziness is not just an interesting oddity; it is 
+vitally critical in many circumstances, as will become apparent below.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">When used effectively, 
+the primary benefit of streams is improved modularity.  Consider 
+a process that takes a sequence of items, operating on each in turn.  
+If the operation is complex, it may be useful to split it into two or 
+more procedures in which the partially-processed sequence is an intermediate 
+result.  If that sequence is stored as a list, the entire intermediate 
+result must reside in memory all at once; however, if the intermediate 
+result is stored as a stream, it can be generated piecemeal, using only 
+as much memory as required by a single item.  This leads to a programming 
+style that uses many small operators, each operating on the sequence 
+of items as a whole, similar to a pipeline of unix commands.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">In addition 
+to improved modularity, streams permit a clear exposition of backtracking 
+algorithms using the “stream of successes” technique, and they can 
+be used to model generators and co-routines.  The implicit memoization 
+of streams makes them useful for building persistent data structures, 
+and the laziness of streams permits some multi-pass algorithms to be 
+executed in a single pass.  Savvy programmers use streams to enhance 
+their programs in countless ways.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">There is an 
+obvious space/time trade-off between lists and streams; lists take more 
+space, but streams take more time (to see why, look at all the type 
+conversions in the implementation of the stream primitives).  Streams 
+are appropriate when the sequence is truly infinite, when the space 
+savings are needed, or when they offer a clearer exposition of the algorithms 
+that operate on the sequence.</font></p>
+
+
+<H1>Specification</H1>
+
+<H2>The <font face="Courier New">stream-primitives</font><font face="Times New Roman"> library</font></H2>
+
+<font size="2" face="Times New Roman">The </font><font size="2" face="Courier New">stream-primitives</font><font size="2" face="Times New Roman"> 
+library provides two mutually-recursive abstract data types:  An 
+object of the </font><font size="2" face="Courier New">stream</font><font size="2" face="Times New Roman"> abstract data type is a promise that, 
+when forced, is either </font><font size="2" face="Courier New">stream-null</font><font size="2" face="Times New Roman"> or is an object of type </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman">.  
+An object of the </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman"> abstract data type contains a </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> 
+and a </font><font size="2" face="Courier New">stream-cdr</font><font size="2" face="Times New Roman">, which must be a </font><font size="2" face="Courier New">stream</font><font size="2" face="Times New Roman">.  The essential feature of streams 
+is the systematic suspensions of the recursive promises between the 
+two data types.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+&alpha; stream
+  :: (promise stream-null)
+  |  (promise (&alpha; stream-pair))</pre><pre>
+&alpha; stream-pair
+  :: (promise &alpha;) × (promise (&alpha; stream))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The object 
+stored in the </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> of a </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman"> is a promise that is forced the first 
+time the </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> is accessed; its value is cached in 
+case it is needed again.  The object may have any type, and different 
+stream elements may have different types.  If the </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> is never accessed, the object stored 
+there is never evaluated.  Likewise, the </font><font size="2" face="Courier New">stream-cdr</font><font size="2" face="Times New Roman"> is a promise to return a stream, and 
+is only forced on demand.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">This library 
+provides eight operators: constructors for </font><font size="2" face="Courier New">stream-null</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman">s, type recognizers for streams and 
+the two kinds of streams, accessors for both fields of a </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman">, 
+and a lambda that creates procedures that return streams.  To use 
+the stream primitives, include the following line before using them:</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(import (stream-primitives))</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>constructor: </b></font><font size="2" face="Courier New"><b>stream-null</b></font><br>
+<font size="2" face="Courier New">Stream-null</font><font size="2" face="Times New Roman"> is a promise that, when forced, is 
+a single object, distinguishable from all other objects, that represents 
+the null stream.  </font><font size="2" face="Courier New">Stream-null</font><font size="2" face="Times New Roman"> is immutable and unique.</font></p>
+
+<p align="justify"><font size="2" face="Courier New"><font size="2" face="Times New Roman"><b>constructor: </b></font><b>(stream-cons </b></font><font size="2" face="Times New Roman"><b><i>object</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">Stream-cons</font><font size="2" face="Times New Roman"> is a macro that accepts an <i>object</i> 
+and a <i>stream</i> and creates a newly-allocated </font><font size="2" face="Courier New">stream</font><font size="2" face="Times New Roman"> containing a promise that, when forced, 
+is a </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman"> with the <i>object</i> in its </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> 
+and the <i>stream</i> in its </font><font size="2" face="Courier New">stream-cdr</font><font size="2" face="Times New Roman">.  </font><font size="2" face="Courier New">Stream-cons</font><font size="2" face="Times New Roman"> must be syntactic, not procedural, 
+because neither <i>object</i> nor <i>stream</i> is evaluated when </font><font size="2" face="Courier New">stream-cons</font><font size="2" face="Times New Roman"> 
+is called.  Since <i>stream</i> is not evaluated, when the stream-pair 
+is created, it is not an error to call </font><font size="2" face="Courier New">stream-cons</font><font size="2" face="Times New Roman"> with a <i>stream</i> that is not of 
+type </font><font size="2" face="Courier New">stream</font><font size="2" face="Times New Roman">; 
+however, doing so will cause an error later when the </font><font size="2" face="Courier New">stream-cdr</font><font size="2" face="Times New Roman"> of the </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman"> is accessed.  Once created, a </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman"> 
+is immutable; there is no </font><font size="2" face="Courier New">stream-set-car!</font><font size="2" face="Times New Roman"> or </font><font size="2" face="Courier New">stream-set-cdr!</font><font size="2" face="Times New Roman"> that modifies an existing </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman">.  
+There is no dotted-pair or improper stream as with lists.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>recognizer: </b></font><font size="2" face="Courier New"><b>(stream? </b></font><font size="2" face="Times New Roman"><b><i>object</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">Stream?</font><font size="2" face="Times New Roman"> is a procedure that takes an <i>object</i> 
+and returns </font><font size="2" face="Courier New">#t</font><font size="2" face="Times New Roman"> 
+if the <i>object</i> is a stream and </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman"> otherwise.  If <i>object</i> 
+is a stream, </font><font size="2" face="Courier New">stream?</font><font size="2" face="Times New Roman"> does not force its promise.  
+If </font><font size="2" face="Courier New">(stream? obj)</font><font size="2" face="Times New Roman"> is </font><font size="2" face="Courier New">#t</font><font size="2" face="Times New Roman">, then one of </font><font size="2" face="Courier New">(stream-null? 
+obj)</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">(stream-pair? 
+obj)</font><font size="2" face="Times New Roman"> will be </font><font size="2" face="Courier New">#t</font><font size="2" face="Times New Roman"> 
+and the other will be </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">; if </font><font size="2" face="Courier New">(stream? 
+obj)</font><font size="2" face="Times New Roman"> is </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">, both </font><font size="2" face="Courier New">(stream-null? 
+obj)</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">(stream-pair? 
+obj)</font><font size="2" face="Times New Roman"> will be </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">. </font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>recognizer: </b></font><font size="2" face="Courier New"><b>(stream-null? </b></font><font size="2" face="Times New Roman"><b><i>object</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">Stream-null?</font><font size="2" face="Times New Roman"> is a procedure that takes an <i>object</i> 
+and returns </font><font size="2" face="Courier New">#t</font><font size="2" face="Times New Roman"> 
+if the <i>object</i> is the distinguished null stream and </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman"> 
+otherwise.  If <i>object</i> is a stream, </font><font size="2" face="Courier New">stream-null?</font><font size="2" face="Times New Roman"> must force its promise in order to 
+distinguish </font><font size="2" face="Courier New">stream-null</font><font size="2" face="Times New Roman"> from </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>recognizer: </b></font><font size="2" face="Courier New"><b>(stream-pair? </b></font><font size="2" face="Times New Roman"><b><i>object</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">Stream-pair?</font><font size="2" face="Times New Roman"> is a procedure that takes an <i>object</i> 
+and returns </font><font size="2" face="Courier New">#t</font><font size="2" face="Times New Roman"> 
+if the <i>object</i> is a </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman"> constructed by </font><font size="2" face="Courier New">stream-cons</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman"> otherwise.  If <i>object</i> 
+is a stream, </font><font size="2" face="Courier New">stream-pair?</font><font size="2" face="Times New Roman"> must force its promise in order to 
+distinguish </font><font size="2" face="Courier New">stream-null</font><font size="2" face="Times New Roman"> from </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>accessor: </b></font><font size="2" face="Courier New"><b>(stream-car </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">Stream-car</font><font size="2" face="Times New Roman"> is a procedure that takes a <i>stream</i> 
+and returns the object stored in the </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> of the <i>stream</i>.  </font><font size="2" face="Courier New">Stream-car</font><font size="2" face="Times New Roman"> 
+signals an error if the object passed to it is not a </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman">.  Calling </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> causes the object stored there to 
+be evaluated if it has not yet been; the object’s value is cached 
+in case it is needed again.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>accessor: </b></font><font size="2" face="Courier New"><b>(stream-cdr </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">Stream-cdr</font><font size="2" face="Times New Roman"> is a procedure that takes a <i>stream</i> 
+and returns the stream stored in the </font><font size="2" face="Courier New">stream-cdr</font><font size="2" face="Times New Roman"> of the <i>stream</i>.  </font><font size="2" face="Courier New">Stream-cdr</font><font size="2" face="Times New Roman"> 
+signals an error if the object passed to it is not a </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman">.  Calling </font><font size="2" face="Courier New">stream-cdr</font><font size="2" face="Times New Roman"> causes the stream stored there to 
+be evaluated if it has not yet been, and is cached in case it is needed 
+again.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>lambda: </b></font><font size="2" face="Times New Roman"><b>(</b></font><font size="2" face="Courier New"><b>stream-lambda </b></font><font size="2" face="Times New Roman"><b><i>args</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>body</i>)</b></font><br>
+<font size="2" face="Courier New">Stream-lambda</font><font size="2" face="Times New Roman"> creates a procedure that returns a 
+promise to evaluate the <i>body</i> of the procedure.  The last <i>
+body</i> expression to be evaluated must yield a stream.  As with 
+normal </font><font size="2" face="Courier New">lambda</font><font size="2" face="Times New Roman">, <i>
+args</i> may be a single variable name, in which case all the formal 
+arguments are collected into a single list, or a list of variable names, 
+which may be null if there are no arguments, proper if there are an 
+exact number of arguments, or dotted if a fixed number of arguments 
+is to be followed by zero or more arguments collected into a list.  <i>
+Body</i> must contain at least one expression, and may contain internal 
+definitions preceding any expressions to be evaluated.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define strm123
+  (stream-cons 1
+    (stream-cons 2
+      (stream-cons 3
+        stream-null))))</font></pre></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-car strm123) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+1</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-car (stream-cdr 
+strm123) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+2</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-pair?
+  (stream-cdr
+    (stream-cons (/ 1 0) stream-null))) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> #f</font></pre></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream? (list 
+1 2 3)) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+#f</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define iter
+  (stream-lambda (f x)
+    (stream-cons x (iter f (f x)))))</font></pre></p>
+
+<p align="justify"><font size="1" face="Courier New">(define nats (iter 
+(lambda (x) (+ x 1)) 0))</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-car (stream-cdr 
+nats)) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+1</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define stream-add
+  (stream-lambda (s1 s2)
+    (stream-cons
+      (+ (stream-car s1) (stream-car s2))
+      (stream-add (stream-cdr s1)
+                  (stream-cdr s2)))))</font></pre></p>
+
+<p align="justify"><font size="1" face="Courier New">(define evens (stream-add 
+nats nats))</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-car evens) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 0</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-car (stream-cdr 
+evens)) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+2</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-car (stream-cdr 
+(stream-cdr evens))) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 4</font></p>
+
+<H2>The <font face="Courier New">stream-derived</font><font face="Times New Roman"> library</font></H2>
+
+<font size="2" face="Times New Roman">The </font><font size="2" face="Courier New">stream-derived</font><font size="2" face="Times New Roman"> 
+library provides useful procedures and syntax that depend on the primitives 
+defined above.  To use the library, include the following line before 
+the first reference to any operator in the library:</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(import (stream-derived))</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">In the operator 
+templates given below, an ellipsis </font><font size="2" face="Courier New">...</font><font size="2" face="Times New Roman"> indicates zero or more repetitions 
+of the preceding subexpression and square brackets </font><font size="2" face="Courier New">[…]</font><font size="2" face="Times New Roman"> indicate optional elements.  
+In the type annotations given below, square brackets </font><font size="2" face="Courier New">[…]</font><font size="2" face="Times New Roman"> refer to lists, curly braces </font><font size="2" face="Courier New">{…}</font><font size="2" face="Times New Roman"> 
+refer to streams, and </font><font size="2" face="Courier New">nat</font><font size="2" face="Times New Roman"> refers to exact non-negative integers.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>syntax: </b></font><font size="2" face="Courier New"><b>(define-stream 
+(</b></font><font size="2" face="Times New Roman"><b><i>name</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>args</i></b></font><font size="2" face="Courier New"><b>) </b></font><font size="2" face="Times New Roman"><b><i>body</i></b></font><font size="2" face="Courier New"><b>) </b></font><br>
+<font size="2" face="Courier New">Define-stream</font><font size="2" face="Times New Roman"> creates a procedure that returns a 
+stream, and may appear anywhere a normal </font><font size="2" face="Courier New">define</font><font size="2" face="Times New Roman"> may appear, including as an internal 
+definition, and may have internal definitions of its own, including 
+other </font><font size="2" face="Courier New">define-stream</font><font size="2" face="Times New Roman">s.  The defined procedure takes 
+arguments in the same way as </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman">.  </font><font size="2" face="Courier New">Define-stream</font><font size="2" face="Times New Roman"> is syntactic sugar on </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman">; 
+see also </font><font size="2" face="Courier New">stream-let</font><font size="2" face="Times New Roman">, which is also a sugaring of </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">A simple version 
+of stream-map that takes only a single input stream calls itself recursively:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-map proc strm)
+  (if (stream-null? strm)
+      stream-null
+      (stream-cons
+        (proc (stream-car strm))
+        (stream-map proc (stream-cdr strm))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font><font size="2" face="Courier New"><b>(list-&gt;stream </b></font><font size="2" face="Times New Roman"><b><i>list-of-objects</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">[&alpha;] &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">List-&gt;stream</font><font size="2" face="Times New Roman"> takes a list of objects and returns 
+a newly-allocated stream containing in its elements the objects in the 
+list.  Since the objects are given in a list, they are evaluated 
+when </font><font size="2" face="Courier New">list-&gt;stream</font><font size="2" face="Times New Roman"> is called, before the stream is created.  
+If the list of objects is null, as in </font><font size="2" face="Courier New">(list-&gt;stream 
+&#39;())</font><font size="2" face="Times New Roman">, the null stream is 
+returned.  See also </font><font size="2" face="Courier New">stream</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(define strm123 (list-&gt;stream &#39;(1 2 3)))</font></p>
+
+<p align="justify"><font size="1" face="Courier New">
+<pre>; fails with divide-by-zero error
+(define s (list-&gt;stream (list 1 (/ 1 0) -1)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font><font size="2" face="Courier New"><b>(port-&gt;stream 
+[</b></font><font size="2" face="Times New Roman"><b><i>port</i></b></font><font size="2" face="Courier New"><b>])</b></font><br>
+<font size="2" face="Courier New">port &rarr; {char}</font><br>
+<font size="2" face="Courier New">Port-&gt;stream</font><font size="2" face="Times New Roman"> takes a <i>port</i> and returns a 
+newly-allocated stream containing in its elements the characters on 
+the port.  If <i>port</i> is not given it defaults to the current 
+input port.  The returned stream has finite length and is terminated 
+by </font><font size="2" face="Courier New">stream-null</font><font size="2" face="Times New Roman">.</font></p>
+<p align="justify"><font size="2" face="Times New Roman">It looks like 
+one use of </font><font size="2" face="Courier New">port-&gt;stream</font><font size="2" face="Times New Roman"> would be this:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define s ;wrong!
+  (with-input-from-file filename
+    (lambda () (port-&gt;stream))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">But that fails, 
+because </font><font size="2" face="Courier New">with-input-from-file</font><font size="2" face="Times New Roman"> is eager, and closes the input port 
+prematurely, before the first character is read.  To read a file 
+into a stream, say:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (file-&gt;stream filename)
+  (let ((p (open-input-file filename)))
+    (stream-let loop ((c (read-char p)))
+      (if (eof-object? c)
+          (begin (close-input-port p)
+                 stream-null)
+          (stream-cons c
+            (loop (read-char p)))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>syntax: </b></font><font size="2" face="Courier New"><b>(stream </b></font><font size="2" face="Times New Roman"><b><i>object</i> </b></font><font size="2" face="Courier New"><b>...)</b></font><br>
+<font size="2" face="Courier New">Stream</font><font size="2" face="Times New Roman"> is syntax that takes zero or more <i>
+object</i>s and creates a newly-allocated stream containing in its elements 
+the <i>object</i>s, in order.  Since </font><font size="2" face="Courier New">stream</font><font size="2" face="Times New Roman"> is syntactic, the <i>object</i>s are 
+evaluated when they are accessed, not when the stream is created.  
+If no <i>object</i>s are given, as in </font><font size="2" face="Courier New">(stream)</font><font size="2" face="Times New Roman">, the null stream is returned.  
+See also </font><font size="2" face="Courier New">list-&gt;stream</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(define strm123 (stream 1 2 3))</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+; (/ 1 0) not evaluated when stream is created
+(define s (stream 1 (/ 1 0) -1))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font><font size="2" face="Courier New"><b>(stream-&gt;list 
+[</b></font><font size="2" face="Times New Roman"><b><i>n</i></b></font><font size="2" face="Courier New"><b>] </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">nat &times; {&alpha;} &rarr; [&alpha;]</font><br>
+<font size="2" face="Courier New">Stream-&gt;list</font><font size="2" face="Times New Roman"> takes a natural number <i>n</i> and 
+a <i>stream</i> and returns a newly-allocated list containing in its 
+elements the first <i>n</i> items in the <i>stream</i>. If the <i>stream</i> 
+has less than <i>n</i> items all the items in the <i>stream</i> will 
+be included in the returned list.  If <i>n</i> is not given it 
+defaults to infinity, which means that unless <i>stream</i> is finite </font><font size="2" face="Courier New">stream-&gt;list</font><font size="2" face="Times New Roman"> 
+will never return.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-&gt;list 10
+  (stream-map (lambda (x) (* x x))
+    (stream-from 0)))
+  </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> (0 1 4 9 16 25 36 49 64 81)</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b>
+</font><font size="2" face="Courier New"><b>(stream-append </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b> ...)</b></font><br>
+<font size="2" face="Courier New">{&alpha;} ... &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-append</font><font size="2" face="Times New Roman"> returns a newly-allocated stream containing 
+in its elements those elements contained in its input <i>stream</i>s, 
+in order of input.  If any of the input <i>stream</i>s is infinite, 
+no elements of any of the succeeding input <i>stream</i>s will appear 
+in the output stream; thus, if </font><font size="2" face="Courier New">x</font><font size="2" face="Times New Roman"> is infinite, </font><font size="2" face="Courier New">(stream-append 
+x y) &equiv; x</font><font size="2" face="Times New Roman">.  See also </font><font size="2" face="Courier New">stream-concat</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Quicksort can 
+be used to sort a stream, using </font><font size="2" face="Courier New">stream-append</font><font size="2" face="Times New Roman"> to build the output; the sort is lazy; 
+so if only the beginning of the output stream is needed, the end of 
+the stream is never sorted.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (qsort lt? strm)
+  (if (stream-null? strm)
+      stream-null
+      (let ((x (stream-car strm))
+            (xs (stream-cdr strm)))
+        (stream-append
+          (qsort lt?
+            (stream-filter
+              (lambda (u) (lt? u x))
+              xs))
+          (stream x)
+          (qsort lt?
+            (stream-filter
+              (lambda (u) (not (lt? u x)))
+              xs))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Note also that, 
+when used in tail position as in </font><font size="2" face="Courier New">qsort</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">stream-append</font><font size="2" face="Times New Roman"> does not suffer the poor performance 
+of </font><font size="2" face="Courier New">append</font><font size="2" face="Times New Roman"> 
+on lists.  The list version of </font><font size="2" face="Courier New">append</font><font size="2" face="Times New Roman"> requires re-traversal of all its list 
+arguments except the last each time it is called.  But </font><font size="2" face="Courier New">stream-append</font><font size="2" face="Times New Roman"> 
+is different.  Each recursive call to </font><font size="2" face="Courier New">stream-append</font><font size="2" face="Times New Roman"> is suspended; when it is later forced, 
+the preceding elements of the result have already been traversed, so 
+tail-recursive loops that produce streams are efficient even when each 
+element is appended to the end of the result stream.  This also 
+implies that during traversal of the result only one promise needs to 
+be kept in memory at a time.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font><font size="2" face="Courier New"><b>(stream-concat </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">{{&alpha;}} ... &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-concat</font><font size="2" face="Times New Roman"> takes a <i>stream</i> consisting of 
+one or more streams and returns a newly-allocated stream containing 
+all the elements of the input streams.  If any of the streams in 
+the input <i>stream</i> is infinite, any remaining streams in the input <i>
+stream</i> will never appear in the output stream.  See also </font><font size="2" face="Courier New">stream-append</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-&gt;list
+  (stream-concat
+    (stream
+      (stream 1 2) (stream) (stream 3 2 1))))
+  &rArr; (1 2 3 2 1)</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The permutations 
+of a finite stream can be determined by interleaving each element of 
+the stream in all possible positions within each permutation of the 
+other elements of the stream.  </font><font size="2" face="Courier New">Interleave</font><font size="2" face="Times New Roman"> returns a stream of streams with <i>
+x</i> inserted in each possible position of <i>yy</i>:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (interleave x yy)
+  (stream-match yy
+    (() (stream (stream x)))
+    ((y . ys)
+      (stream-append
+        (stream (stream-cons x yy))
+        (stream-map
+          (lambda (z) (stream-cons y z))
+          (interleave x ys))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (perms xs)
+  (if (stream-null? xs)
+      (stream (stream))
+      (stream-concat
+        (stream-map
+          (lambda (ys)
+            (interleave (stream-car xs) ys))
+          (perms (stream-cdr xs))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font><font size="2" face="Courier New"><b>(stream-constant </b></font><font size="2" face="Times New Roman"><b><i>object</i></b></font><font size="2" face="Courier New"><b> ...)</b></font><br>
+<font size="2" face="Courier New">&alpha; ... &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-constant</font><font size="2" face="Times New Roman"> takes one or more <i>object</i>s and 
+returns a newly-allocated stream containing in its elements the <i>object</i>s, 
+repeating the <i>object</i>s in succession forever.</font></p>
+<p align="justify"><font size="1" face="Courier New">(stream-constant 
+1) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+1 1 1 ...</font></p>
+<p align="justify"><font size="1" face="Courier New">(stream-constant 
+#t #f) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+#t #f #t #f #t #f ...</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font><font size="2" face="Courier New"><b>(stream-drop </b></font><font size="2" face="Times New Roman"><b><i>n</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><font size="2" face="Times New Roman"><b> procedure </b></font><br>
+<font size="2" face="Courier New">nat × {&alpha;} &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-drop</font><font size="2" face="Times New Roman"> returns the suffix of the input <i>
+stream</i> that starts at the next element after the first <i>n</i> 
+elements.  The output stream shares structure with the input <i>
+stream</i>; thus, promises forced in one instance of the stream are 
+also forced in the other instance of the stream.  If the input <i>
+stream</i> has less than <i>n</i> elements, </font><font size="2" face="Courier New">stream-drop</font><font size="2" face="Times New Roman"> returns the null stream.  See 
+also </font><font size="2" face="Courier New">stream-take</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-split n strm)
+  (values (stream-take n strm)
+          (stream-drop n strm)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font><font size="2" face="Courier New"><b>(stream-drop-while </b></font><font size="2" face="Times New Roman"><b><i>pred?</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &rarr; boolean) &times; {&alpha;} &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-drop-while</font><font size="2" face="Times New Roman"> returns the suffix of the input <i>
+stream</i> that starts at the first element <i>x</i> for which </font><font size="2" face="Courier New">(pred? </font><font size="2" face="Times New Roman"><i>x</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+is </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">.  
+The output stream shares structure with the input <i>stream</i>.  
+See also </font><font size="2" face="Courier New">stream-take-while</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Courier New">Stream-unique</font><font size="2" face="Times New Roman"> creates a new stream that retains 
+only the first of any sub-sequences of repeated elements.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-unique eql? strm)
+  (if (stream-null? strm)
+      stream-null
+      (stream-cons (stream-car strm)
+        (stream-unique eql?
+          (stream-drop-while
+            (lambda (x)
+              (eql? (stream-car strm) x))
+            strm)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-filter </b></font><font size="2" face="Times New Roman"><b><i>pred?</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &rarr; boolean) &times; {&alpha;} &rarr; {&alpha}</font><br>
+<font size="2" face="Courier New">Stream-filter</font><font size="2" face="Times New Roman"> returns a newly-allocated stream that 
+contains only those elements <i>x</i> of the input <i>stream</i> for 
+which </font><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>pred?</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>x</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+is non-</font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-filter odd? (stream-from 0))
+   &rArr; 1 3 5 7 9 ...</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-fold </b></font><font size="2" face="Times New Roman"><b><i>proc</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>base</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &times; &beta; &rarr; &alpha;) &times; &alpha; &times; {&beta;} &rarr; &alpha;</font><br>
+<font size="2" face="Courier New">Stream-fold</font><font size="2" face="Times New Roman"> applies a binary <i>proc</i>edure 
+to <i>base</i> and the first element of <i>stream</i> to compute a new <i>
+base</i>, then applies the <i>proc</i>edure to the new <i>base</i> and 
+the next element of <i>stream</i> to compute a succeeding <i>base</i>, 
+and so on, accumulating a value that is finally returned as the value 
+of </font><font size="2" face="Courier New">stream-fold</font><font size="2" face="Times New Roman"> 
+when the end of the <i>stream</i> is reached.  <i>Stream</i> must 
+be finite, or </font><font size="2" face="Courier New">stream-fold</font><font size="2" face="Times New Roman"> will enter an infinite loop.  
+See also </font><font size="2" face="Courier New">stream-scan</font><font size="2" face="Times New Roman">, which is similar to </font><font size="2" face="Courier New">stream-fold</font><font size="2" face="Times New Roman">, but useful for infinite streams.  
+For readers familiar with other functional languages, this is a left-fold; 
+there is no corresponding right-fold, since right-fold relies on finite 
+streams that are fully-evaluated, at which time they may as well be 
+converted to a list.</font></p>
+<p align="justify"><font size="2" face="Courier New">Stream-fold</font><font size="2" face="Times New Roman"> is often used to summarize a stream 
+in a single value, for instance, to compute the maximum or minimum element 
+of a stream.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-maximum lt? strm)
+  (stream-fold
+    (lambda (x y) (if (lt? x y) y x))
+    (stream-car strm)
+    (stream-cdr strm)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Sometimes, 
+it is useful to have </font><font size="2" face="Courier New">stream-fold</font><font size="2" face="Times New Roman"> defined only on non-null streams:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-fold-one proc strm)
+  (stream-fold proc
+    (stream-car strm)
+    (stream-cdr strm)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Courier New">Stream-minimum</font><font size="2" face="Times New Roman"> can then be defined as:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-minimum lt? strm)
+  (stream-fold-one
+    (lambda (x y) (if (lt? x y) x y))
+    strm))</pre></font></p>
+
+<p align="justify"><font size="2" face="Courier New">Stream-fold</font><font size="2" face="Times New Roman"> can also be used to build a stream:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (isort lt? strm)
+    (define-stream (insert strm x)
+      (stream-match strm
+        (() (stream x))
+        ((y . ys)
+          (if (lt? y x)
+              (stream-cons y (insert ys x))
+              (stream-cons x strm)))))
+    (stream-fold insert stream-null strm))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-for-each </b></font><font size="2" face="Times New Roman"><b><i>proc</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b> ...)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &times; &beta; &times; ...) &times; {&alpha;} &times; {&beta;} ...</font><br>
+<font size="2" face="Courier New">Stream-for-each</font><font size="2" face="Times New Roman"> applies a <i>proc</i>edure element-wise 
+to corresponding elements of the input <i>stream</i>s for its side-effects; 
+it returns nothing.  </font><font size="2" face="Courier New">Stream-for-each</font><font size="2" face="Times New Roman"> stops as soon as any of its input <i>
+stream</i>s is exhausted.</font></p>
+<p align="justify"><font size="2" face="Times New Roman">The following 
+procedure displays the contents of a file:</font></p>
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (display-file filename)
+  (stream-for-each display
+    (file-&gt;stream filename)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Courier New">
+<font size="2" face="Times New Roman"><b>procedure: </b></font>
+<b>(stream-from </b></font><font size="2" face="Times New Roman"><b><i>first</i></b></font><font size="2" face="Courier New"><b> 
+[</b></font><font size="2" face="Times New Roman"><b><i>step</i></b></font><font size="2" face="Courier New"><b>])</b></font><br>
+<font size="2" face="Courier New">number &times; number &rarr; {number}</font><br>
+<font size="2" face="Courier New">Stream-from</font><font size="2" face="Times New Roman"> creates a newly-allocated stream that 
+contains <i>first</i> as its first element and increments each succeeding 
+element by <i>step</i>.  If <i>step</i> is not given it defaults 
+to </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman">.  <i>
+First</i> and <i>step</i> may be of any numeric type.  </font><font size="2" face="Courier New">Stream-from</font><font size="2" face="Times New Roman"> 
+is frequently useful as a generator in </font><font size="2" face="Courier New">stream-of</font><font size="2" face="Times New Roman"> expressions.  See also </font><font size="2" face="Courier New">stream-range</font><font size="2" face="Times New Roman"> 
+for a similar procedure that creates finite streams.</font><font size="1" face="Courier New"> </font></p>
+<p align="justify"><font size="2" face="Courier New">Stream-from</font><font size="2" face="Times New Roman"> could be implemented as </font><font size="2" face="Courier New">(stream-iterate (lambda (</font><font size="2" face="Times New Roman">x</font><font size="2" face="Courier New">) (+ x </font><font size="2" face="Times New Roman"><i>step</i></font><font size="2" face="Courier New">)) </font><font size="2" face="Times New Roman"><i>first</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman">.</font></p>
+<p align="justify"><font size="1" face="Courier New">(define nats (stream-from 
+0)) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+0 1 2 ...</font></p>
+<p align="justify"><font size="1" face="Courier New">(define odds (stream-from 
+1 2)) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+1 3 5 ...</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-iterate proc base)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &rarr; &alpha;) &times; &alpha; &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-iterate</font><font size="2" face="Times New Roman"> creates a newly-allocated stream containing <i>
+base</i> in its first element and applies <i>proc</i> to each element 
+in turn to determine the succeeding element.  See also </font><font size="2" face="Courier New">stream-unfold</font><font size="2" face="Times New Roman"> 
+and </font><font size="2" face="Courier New">stream-unfolds</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-iterate (lambda (x) (+ x 1)) 0)
+  &rArr; 0 1 2 3 4 ...</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-iterate (lambda (x) (* x 2)) 1)
+  &rArr; 1 2 4 8 16 ...</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Given a <i>
+seed</i> between </font><font size="2" face="Courier New">0</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">2<sup>32</sup></font><font size="2" face="Times New Roman">, exclusive, the following expression 
+creates a stream of pseudo-random integers between </font><font size="2" face="Courier New">0</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">2<sup>32</sup></font><font size="2" face="Times New Roman">, exclusive, beginning with <i>seed</i>, 
+using the method described by Stephen Park and Keith Miller:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-iterate
+  (lambda (x) (modulo (* x 16807) 2147483647))
+  </font><font size="2" face="Times New Roman"><i>seed</i></font><font size="1" face="Courier New">)</pre></font></p>
+
+<p><font size="2" face="Times New Roman">Successive values of the continued 
+fraction shown below approach the value of the &ldquo;golden ratio&rdquo; &phi; 
+&asymp; 1.618:</font></p>
+
+<p align="center"><img src="streams1.jpg" width="131" height="126" alt="Continued fraction"></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The fractions 
+can be calculated by the stream</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-iterate 
+(lambda (x) (+ 1 (/ x))) 1)</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-length </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">{&alpha;} &rarr; nat</font><br>
+<font size="2" face="Courier New">Stream-length</font><font size="2" face="Times New Roman"> takes an input <i>stream</i> and returns 
+the number of elements in the <i>stream</i>; it does not evaluate its 
+elements.  </font><font size="2" face="Courier New">Stream-length</font><font size="2" face="Times New Roman"> may only be used on finite streams; 
+it enters an infinite loop with infinite streams.</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-length 
+strm123) </font><font size="1" face="Symbol">&rArr;</font><font size="1" face="Courier New"> 
+3</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>syntax: </b></font>
+<font size="2" face="Courier New"><b>(stream-let </b></font><font size="2" face="Times New Roman"><b><i>tag</i></b></font><font size="2" face="Courier New"><b> 
+((</b></font><font size="2" face="Times New Roman"><b><i>var</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>expr</i></b></font><font size="2" face="Courier New"><b>) ...) </b></font><font size="2" face="Times New Roman"><b><i>body</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">Stream-let</font><font size="2" face="Times New Roman"> creates a local scope that binds each <i>
+var</i>iable<i> </i>to the value of its corresponding <i>expr</i>ession.  
+It additionally binds <i>tag</i> to a procedure which takes the bound <i>
+var</i>iables as arguments and <i>body</i> as its defining expressions, 
+binding the <i>tag</i> with </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman">. <i>Tag</i> is in scope within <i>
+body</i>, and may be called recursively.  When the expanded expression 
+defined by the </font><font size="2" face="Courier New">stream-let</font><font size="2" face="Times New Roman"> is evaluated, </font><font size="2" face="Courier New">stream-let</font><font size="2" face="Times New Roman"> evaluates the expressions in its <i>
+body</i> in an environment containing the newly-bound <i>var</i>iables, 
+returning the value of the last expression evaluated, which must yield 
+a stream.</font></p>
+
+<p align="justify"><font size="2" face="Courier New">Stream-let</font><font size="2" face="Times New Roman"> provides syntactic sugar on </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman">, 
+in the same manner as normal </font><font size="2" face="Courier New">let</font><font size="2" face="Times New Roman"> provides syntactic sugar on normal </font><font size="2" face="Courier New">lambda</font><font size="2" face="Times New Roman">.  
+However, unlike normal </font><font size="2" face="Courier New">let</font><font size="2" face="Times New Roman">, the <i>tag</i> is required, not optional, 
+because unnamed </font><font size="2" face="Courier New">stream-let</font><font size="2" face="Times New Roman"> is meaningless. </font></p>
+
+<p align="justify"><font size="2" face="Courier New">Stream-member</font><font size="2" face="Times New Roman"> returns the first stream-pair of the 
+input </font><font size="2" face="Courier New">strm</font><font size="2" face="Times New Roman"> 
+with a </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> <i>x</i> that satisfies </font><font size="2" face="Courier New">(eql? obj </font><font size="2" face="Times New Roman"><i>x</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-member eql? obj strm)
+  (stream-let loop ((strm strm))
+    (cond ((stream-null? strm) #f)
+          ((eql? obj (stream-car strm)) strm)
+          (else (loop (stream-cdr strm))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-map </b></font><font size="2" face="Times New Roman"><b><i>proc stream</i> </b></font><font size="2" face="Courier New"><b>...)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &times; &beta; ... &rarr; &omega;) &times; {&alpha;} &times; {&beta;} ... &rarr; {&omega;}</font><br>
+<font size="2" face="Courier New">Stream-map</font><font size="2" face="Times New Roman"> applies a <i>proc</i>edure element-wise 
+to corresponding elements of the input <i>stream</i>s, returning a newly-allocated 
+stream containing elements that are the results of those <i>proc</i>edure 
+applications.  The output stream has as many elements as the minimum-length 
+input <i>stream</i>, and may be infinite.</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(define (square 
+x) (* x x))</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-map square 
+(stream 9 3)) &rArr; 81 9</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (sigma f m n)
+  (stream-fold + 0
+    (stream-map f (stream-range m (+ n 1)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New">(sigma square 1 
+100) &rArr; 338350</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">In some functional 
+languages, </font><font size="2" face="Courier New">stream-map</font><font size="2" face="Times New Roman"> takes only a single input stream, 
+and </font><font size="2" face="Courier New">stream-zipwith</font><font size="2" face="Times New Roman"> provides a companion function that 
+takes multiple input streams.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>syntax: </b></font>
+<font size="2" face="Courier New"><b>(stream-match </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>clause</i></b></font><font size="2" face="Courier New"><b> ...)</b></font><br>
+<font size="2" face="Courier New">Stream-match</font><font size="2" face="Times New Roman"> provides the syntax of pattern-matching 
+for streams.  The input <i>stream</i> is an expression that evaluates 
+to a stream.  Clauses are of the form </font><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>pattern</i></font><font size="2" face="Courier New"> 
+[</font><font size="2" face="Times New Roman"><i>fender</i></font><font size="2" face="Courier New">] </font><font size="2" face="Times New Roman"><i>expr</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman">, 
+consisting of a <i>pattern</i> that matches a stream of a particular 
+shape, an optional <i>fender</i> that must succeed if the pattern is 
+to match, and an <i>expr</i>ession that is evaluated if the <i>pattern</i> 
+matches.  There are four types of <i>pattern</i>s:</font></p>
+
+<ul type="DISC">
+  <li><font size="2" face="Courier New">()</font><font size="2" face="Times New Roman"> 
+  — Matches the null stream.</font></li>
+  <li><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>pat</i><sub><i>0</i></sub></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>pat</i><sub><i>1</i></sub></font><font size="2" face="Courier New"> ...)</font><font size="2" face="Times New Roman"> 
+  — Matches a finite stream with length exactly equal to the number 
+  of pattern elements.</font></li>
+  <li><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>pat</i><sub><i>0</i></sub></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>pat</i><sub><i>1</i></sub></font><font size="2" face="Courier New"> ... . </font><font size="2" face="Times New Roman"><i>pat</i><sub><i>rest</i></sub></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+  — Matches an infinite stream, or a finite stream with length at least 
+  as great as the number of pattern elements before the literal dot.</font></li>
+  <li><font size="2" face="Times New Roman"><i>pat</i> —Matches 
+  an entire stream.  Should always appear last in the list of clauses; 
+  it’s not an error to appear elsewhere, but subsequent clauses could 
+  never match.</font></li>
+</ul>
+
+<p align="justify"><font size="2" face="Times New Roman">Each pattern 
+element <i>pat</i><sub><i>i</i></sub> may be either:</font></p>
+
+<ul type="DISC">
+  <li><font size="2" face="Times New Roman">An identifier — 
+  Matches any stream element.  Additionally, the value of the stream 
+  element is bound to the variable named by the identifier, which is in 
+  scope in the <i>fender</i> and <i>expr</i>ession of the corresponding <i>clause</i>.  
+  Each identifier in a single pattern must be unique.</font></li>
+  <li><font size="2" face="Times New Roman">A literal underscore 
+  — Matches any stream element, but creates no bindings.</font></li>
+</ul>
+
+<p align="justify"><font size="2" face="Times New Roman">The <i>pattern</i>s 
+are tested in order, left-to-right, until a matching pattern is found; 
+if <i>fender</i> is present, it must evaluate as non-</font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman"> for the match to be successful.  
+Pattern variables are bound in the corresponding <i>fender</i> and <i>
+expr</i>ession.  Once the matching pattern is found, the corresponding <i>
+expr</i>ession is evaluated and returned as the result of the match.  
+An error is signaled if no pattern matches the input <i>stream</i>.</font></p>
+
+<p align="justify"><font size="2" face="Courier New">Stream-match</font><font size="2" face="Times New Roman"> is often used to distinguish null 
+streams from non-null streams, binding </font><font size="2" face="Courier New">head</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">tail</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (len strm)
+  (stream-match strm
+    (() 0)
+    ((head . tail) (+ 1 (len tail)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Fenders can 
+test the common case where two stream elements must be identical; the </font><font size="2" face="Courier New">else</font><font size="2" face="Times New Roman"> 
+pattern is an identifier bound to the entire stream, not a keyword as 
+in </font><font size="2" face="Courier New">cond</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-match strm
+  ((x y . _) (equal? x y) &#39;ok)
+  (else &#39;error))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">A more complex 
+example uses two nested matchers to match two different stream arguments; </font><font size="2" face="Courier New">(stream-merge lt? . </font><font size="2" face="Times New Roman"><i>strms</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+stably merges two or more streams ordered by the </font><font size="2" face="Courier New">lt?</font><font size="2" face="Times New Roman"> predicate:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-merge lt? . strms)
+  (define-stream (merge xx yy)
+    (stream-match xx (() yy) ((x . xs)
+      (stream-match yy (() xx) ((y . ys)
+        (if (lt? y x)
+            (stream-cons y (merge xx ys))
+            (stream-cons x (merge xs yy))))))))
+  (stream-let loop ((strms strms))
+    (cond ((null? strms) stream-null)
+          ((null? (cdr strms)) (car strms))
+          (else (merge (car strms)
+                       (apply stream-merge lt?
+                         (cdr strms)))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>syntax: </b></font>
+<font size="2" face="Courier New"><b>(stream-of </b></font><font size="2" face="Times New Roman"><b><i>expr</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>clause</i></b></font><font size="2" face="Courier New"><b> ...)</b></font><br>
+<font size="2" face="Courier New">Stream-of</font><font size="2" face="Times New Roman"> provides the syntax of stream comprehensions, 
+which generate streams by means of looping expressions.  The result 
+is a stream of objects of the type returned by <i>expr</i>.  There 
+are four types of clauses:</font></p>
+
+<ul type="DISC">
+  <li><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>var</i></font><font size="2" face="Courier New"> in </font><font size="2" face="Times New Roman"><i>stream-expr</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+  — Loop over the elements of <i>stream-expr</i>, in order from the 
+  start of the stream, binding each element of the stream in turn to <i>
+  var</i>.  </font><font size="2" face="Courier New">Stream-from</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">stream-range</font><font size="2" face="Times New Roman"> are frequently useful as generators 
+  for <i>stream-expr</i>.</font></li>
+  <li><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>var</i></font><font size="2" face="Courier New"> is </font><font size="2" face="Times New Roman"><i>expr</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+  — Bind <i>var</i> to the value obtained by evaluating <i>expr</i>.</font></li>
+  <li><font size="2" face="Courier New">(pred? </font><font size="2" face="Times New Roman"><i>expr</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+  — Include in the output stream only those elements <i>x</i> for which </font><font size="2" face="Courier New">(pred? </font><font size="2" face="Times New Roman"><i>x</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+  is non-</font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">.</font></li>
+</ul>
+
+<p align="justify"><font size="2" face="Times New Roman">The scope of <i>
+var</i>iables bound in the stream comprehension is the clauses to the 
+right of the binding clause (but not the binding clause itself) plus 
+the result expression.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">When two or 
+more generators are present, the loops are processed as if they are 
+nested from left to right; that is, the rightmost generator varies fastest.  
+A consequence of this is that only the first generator may be infinite 
+and all subsequent generators must be finite.  If no generators 
+are present, the result of a stream comprehension is a stream containing 
+the result expression; thus, </font><font size="2" face="Courier New">(stream-of 
+1)</font><font size="2" face="Times New Roman"> produces a finite stream 
+containing only the element </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-of (* x x)
+  (x in (stream-range 0 10))
+  (even? x))
+  &rArr; 0 4 16 36 64</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-of (list a b)
+  (a in (stream-range 1 4))
+  (b in (stream-range 1 3))) 
+  &rArr; (1 1) (1 2) (2 1) (2 2) (3 1) (3 2)</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-of (list i j)
+  (i in (stream-range 1 5))
+  (j in (stream-range (+ i 1) 5)))
+  &rArr; (1 2) (1 3) (1 4) (2 3) (2 4) (3 4)</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-range </b></font><font size="2" face="Times New Roman"><b><i>first</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>past</i></b></font><font size="2" face="Courier New"><b> 
+[</b></font><font size="2" face="Times New Roman"><b><i>step</i></b></font><font size="2" face="Courier New"><b>])</b></font><br>
+<font size="2" face="Courier New">number &times; number &times; number &rarr; {number}</font><br>
+<font size="2" face="Courier New">Stream-range</font><font size="2" face="Times New Roman"> creates a newly-allocated stream that 
+contains <i>first</i> as its first element and increments each succeeding 
+element by <i>step</i>.  The stream is finite and ends before <i>
+past</i>, which is not an element of the stream.  If <i>step</i> 
+is not given it defaults to </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman"> if <i>first</i> is less than <i>past</i> 
+and </font><font size="2" face="Courier New">-1</font><font size="2" face="Times New Roman"> 
+otherwise.  <i>First</i>, <i>past</i> and <i>step</i> may be of 
+any numeric type.  </font><font size="2" face="Courier New">Stream-range</font><font size="2" face="Times New Roman"> is frequently useful as a generator 
+in </font><font size="2" face="Courier New">stream-of</font><font size="2" face="Times New Roman"> 
+expressions.  See also </font><font size="2" face="Courier New">stream-from</font><font size="2" face="Times New Roman"> for a similar procedure that creates 
+infinite streams.</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-range 0 
+10) &rArr; 0 1 2 3 4 5 6 7 8 9</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(stream-range 0 
+10 2) &rarr; 0 2 4 6 8</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Successive 
+elements of the stream are calculated by adding <i>step</i> to <i>first</i>, 
+so if any of <i>first</i>, <i>past</i> or <i>step</i> are inexact, the 
+length of the output stream may differ from </font><font size="2" face="Courier New">(ceiling 
+(- (/ (- </font><font size="2" face="Times New Roman"><i>past</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>first</i></font><font size="2" face="Courier New">) </font><font size="2" face="Times New Roman"><i>step</i></font><font size="2" face="Courier New">) 1)</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-ref </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>n</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">{&alpha;} &times; nat &rarr; &alpha;</font><br>
+<font size="2" face="Courier New">Stream-ref</font><font size="2" face="Times New Roman"> returns the <i>n</i>th element of <i>
+stream</i>, counting from zero.  An error is signaled if <i>n</i> 
+is greater than or equal to the length of <i>stream</i>.</font><font size="1" face="Courier New"> </font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (fact n)
+  (stream-ref
+    (stream-scan * 1 (stream-from 1))
+    n))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-reverse </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">{&alpha;} &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-reverse</font><font size="2" face="Times New Roman"> returns a newly-allocated stream containing 
+the elements of the input <i>stream</i> but in reverse order.  </font><font size="2" face="Courier New">Stream-reverse</font><font size="2" face="Times New Roman"> 
+may only be used with finite streams; it enters an infinite loop with 
+infinite streams.  </font><font size="2" face="Courier New">Stream-reverse</font><font size="2" face="Times New Roman"> does not force evaluation of the elements 
+of the stream.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+&gt; (define s (stream 1 (/ 1 0) -1))
+&gt; (define r (stream-reverse s))
+&gt; (stream-ref r 0)
+&gt; (stream-ref r 2)
+1
+&gt; (stream-ref r 1)
+error: division by zero</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-scan </b></font><font size="2" face="Times New Roman"><b><i>proc</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>base</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &times; &beta; &rarr; &alpha;) &times; &alpha; &times; {&beta;} &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-scan</font><font size="2" face="Times New Roman"> accumulates the partial folds of an 
+input <i>stream</i> into a newly-allocated output stream.  The 
+output stream is the <i>base</i> followed by </font><font size="2" face="Courier New">(stream-fold 
+proc base (stream-take </font><font size="2" face="Times New Roman"><i>i</i></font><font size="2" face="Courier New"> stream))</font><font size="2" face="Times New Roman"> 
+for each of the first <i>i</i> elements of <i>stream</i>.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-scan + 0 (stream-from 1))
+  &rArr; (stream 0 1 3 6 10 15 ...)</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-scan * 1 (stream-from 1))
+  &rArr; (stream 1 1 2 6 24 120 ...)</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-take </b></font><font size="2" face="Times New Roman"><b><i>n</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">nat × {&alpha;} &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-take</font><font size="2" face="Times New Roman"> takes a non-negative integer <i>n</i> 
+and a <i>stream</i> and returns a newly-allocated stream containing 
+the first <i>n</i> elements of the input <i>stream</i>.  If the 
+input <i>stream</i> has less than <i>n</i> elements, so does the output 
+stream.  See also </font><font size="2" face="Courier New">stream-drop</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Mergesort splits 
+a stream into two equal-length pieces, sorts them recursively and merges 
+the results:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (msort lt? strm)
+  (let* ((n (quotient (stream-length strm) 2))
+         (ts (stream-take n strm))
+         (ds (stream-drop n strm)))
+    (if (zero? n)
+        strm
+        (stream-merge lt?
+          (msort &lt; ts) (msort &lt; ds)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-take-while </b></font><font size="2" face="Times New Roman"><b><i>pred?</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &rarr; boolean) &times; {&alpha;} &rarr; {&alpha;}</font><br>
+<font size="2" face="Courier New">Stream-take-while</font><font size="2" face="Times New Roman"> takes a predicate and a <i>stream</i> 
+and returns a newly-allocated stream containing those elements <i>x</i> 
+that form the maximal prefix of the input <i>stream</i> for which </font><font size="2" face="Courier New">(pred? </font><font size="2" face="Times New Roman"><i>x</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+is non-</font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">.  
+See also </font><font size="2" face="Courier New">stream-drop-while</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-car
+  (stream-reverse
+    (stream-take-while
+      (lambda (x) (&lt; x 1000))
+        primes))) &rArr; 997</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-unfold </b></font><font size="2" face="Times New Roman"><b><i>map</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>pred?</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>gen</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>base</i>)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &rarr; &beta;) &times; (&alpha; &rarr; boolean) &times; (&alpha; &rarr; &alpha;) × &alpha; &rarr; {&beta;}</font><br>
+<font size="2" face="Courier New">Stream-unfold</font><font size="2" face="Times New Roman"> is the fundamental recursive stream 
+constructor.  It constructs a stream by repeatedly applying <i>
+gen</i> to successive values of <i>base</i>, in the manner of </font><font size="2" face="Courier New">stream-iterate</font><font size="2" face="Times New Roman">, 
+then applying <i>map</i> to each of the values so generated, appending 
+each of the mapped values to the output stream as long as </font><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>pred?</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>base</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+is non-</font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">.  
+See also </font><font size="2" face="Courier New">stream-iterate</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">stream-unfolds</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The expression 
+below creates the finite stream </font><font size="2" face="Courier New">0</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">4</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">9</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">16</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">25</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">36</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">49</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">64</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">81</font><font size="2" face="Times New Roman">.  Initially the </font><font size="2" face="Courier New">base</font><font size="2" face="Times New Roman"> is </font><font size="2" face="Courier New">0</font><font size="2" face="Times New Roman">, which is less than </font><font size="2" face="Courier New">10</font><font size="2" face="Times New Roman">, so <i>map</i> squares the <i>base</i> 
+and the mapped value becomes the first element of the output stream.  
+Then <i>gen</i> increments the <i>base</i> by </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman">, so it becomes </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman">; this is less than </font><font size="2" face="Courier New">10</font><font size="2" face="Times New Roman">, so <i>map</i> squares the new </font><font size="2" face="Courier New">base</font><font size="2" face="Times New Roman"> 
+and </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman"> 
+becomes the second element of the output stream.  And so on, until 
+the <i>base</i> becomes </font><font size="2" face="Courier New">10</font><font size="2" face="Times New Roman">, when <i>pred?</i> stops the recursion 
+and </font><font size="2" face="Courier New">stream-null</font><font size="2" face="Times New Roman"> ends the output stream.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-unfold
+  (lambda (x) (expt x 2)) ; map
+  (lambda (x) (&lt; x 10))   ; pred?
+  (lambda (x) (+ x 1))    ; gen
+  0)                      ; base</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-unfolds </b></font><font size="2" face="Times New Roman"><b><i>proc</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>seed</i></b></font><font size="2" face="Courier New"><b>)</b></font><br>
+<font size="2" face="Courier New">(&alpha; &rarr; (values &alpha; &times; &beta; ...)) &times; &alpha; &rarr; (values {&beta;} ...)</font><br>
+<font size="2" face="Courier New">Stream-unfolds</font><font size="2" face="Times New Roman"> returns <i>n</i> newly-allocated streams 
+containing those elements produced by successive calls to the generator <i>
+proc</i>, which takes the current <i>seed</i> as its argument and returns <i>
+n</i></font><font size="2" face="Courier New">+1</font><font size="2" face="Times New Roman"> 
+values</font></p>
+
+<p align="justify"><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>proc</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>seed</i></font> &rarr; <font size="2" face="Times New Roman"><i>seed</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>result</i><sub><i>0</i></sub></font><font size="2" face="Courier New"> ... </font><font size="2" face="Times New Roman"><i>result</i><sub><i>n-1</i></sub></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">where the returned <i>
+seed</i> is the input <i>seed</i> to the next call to the generator 
+and <i>result</i><sub><i>i</i></sub> indicates how to produce the next 
+element of the <i>i</i><sup><i>th</i></sup> result stream:</font></p>
+
+<ul type="DISC">
+  <li><font size="2" face="Courier New">(</font><font size="2" face="Times New Roman"><i>value</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+  — <i>value</i> is the next car of the result stream</font></li>
+  <li><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman"> 
+  — no value produced by this iteration of the generator <i>proc</i> 
+  for the result stream</font></li>
+  <li><font size="2" face="Courier New">()</font><font size="2" face="Times New Roman"> 
+  — the end of the result stream</font></li>
+</ul>
+
+<p align="justify"><font size="2" face="Times New Roman">It may require 
+multiple calls of <i>proc</i> to produce the next element of any particular 
+result stream.  See also </font><font size="2" face="Courier New">stream-iterate</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">stream-unfold</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Courier New">Stream-unfolds</font><font size="2" face="Times New Roman"> is especially useful when writing 
+expressions that return multiple streams.  For instance, </font><font size="2" face="Courier New">(stream-partition </font><font size="2" face="Times New Roman"><i>pred?</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>strm</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+is equivalent to</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(values
+  (stream-filter </font><font size="1" face="Times New Roman"><i>pred?</i></font><font size="1" face="Courier New"> </font><font size="1" face="Times New Roman"><i>strm</i></font><font size="1" face="Courier New">)
+  (stream-filter
+    (lambda (x) (not (</font><font size="1" face="Times New Roman"><i>pred?</i></font><font size="1" face="Courier New"> x))) </font><font size="1" face="Times New Roman"><i>strm</i></font><font size="1" face="Courier New">))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">but only tests <i>
+pred?</i> once for each element of <i>strm</i>.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-partition pred? strm)
+  (stream-unfolds
+    (lambda (s)
+      (if (stream-null? s)
+          (values s &#39;() &#39;())
+          (let ((a (stream-car s))
+                (d (stream-cdr s)))
+            (if (pred? a)
+                (values d (list a) #f)
+                (values d #f (list a))))))
+    strm))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(call-with-values
+  (lambda ()
+    (stream-partition odd?
+      (stream-range 1 6)))
+  (lambda (odds evens)
+    (list (stream-&gt;list odds)
+          (stream-&gt;list evens))))
+  &rArr; ((1 3 5) (2 4))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman"><b>procedure: </b></font>
+<font size="2" face="Courier New"><b>(stream-zip </b></font><font size="2" face="Times New Roman"><b><i>stream</i></b></font><font size="2" face="Courier New"><b> ...)</b></font><br>
+<font size="2" face="Courier New">{&alpha;} &times; {&beta;} &times; ... &rarr; {[&alpha; &beta; ...]}</font><br>
+<font size="2" face="Courier New">Stream-zip</font><font size="2" face="Times New Roman"> takes one or more input <i>stream</i>s 
+and returns a newly-allocated stream in which each element is a list 
+(not a stream) of the corresponding elements of the input <i>stream</i>s.  
+The output stream is as long as the shortest input <i>stream</i>, if 
+any of the input <i>stream</i>s is finite, or is infinite if all the 
+input <i>stream</i>s are infinite.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">A common use 
+of </font><font size="2" face="Courier New">stream-zip</font><font size="2" face="Times New Roman"> 
+is to add an index to a stream, as in </font><font size="2" face="Courier New">(stream-finds </font><font size="2" face="Times New Roman"><i>eql?</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>obj</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>strm</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman">, which returns all the zero-based 
+indices in <i>strm</i> at which <i>obj</i> appears; </font><font size="2" face="Courier New">(stream-find </font><font size="2" face="Times New Roman"><i>eql?</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>obj</i></font><font size="2" face="Courier New"> </font><font size="2" face="Times New Roman"><i>strm</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> returns the first such index, or </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman"> 
+if <i>obj</i> is not in <i>strm</i>.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-finds eql? obj strm)
+  (stream-of (car x)
+    (x in (stream-zip (stream-from 0) strm))
+    (eql? obj (cadr x))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-find eql? obj strm)
+  (stream-car
+    (stream-append
+      (stream-finds eql? obj strm)
+      (stream #f))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-find char=? #\l
+  (list-&gt;stream
+    (string-&gt;list &quot;hello&quot;))) &rArr; 2</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-find char=? #\l
+  (list-&gt;stream
+    (string-&gt;list &quot;goodbye&quot;))) &rArr; #f</pre></font></p>
+
+<p align="justify"><font size="2" face="Courier New">Stream-find</font><font size="2" face="Times New Roman"> is not as inefficient as it looks; 
+although it calls </font><font size="2" face="Courier New">stream-finds</font><font size="2" face="Times New Roman">, which finds all matching indices, 
+the matches are computed lazily, and only the first match is needed 
+for </font><font size="2" face="Courier New">stream-find</font><font size="2" face="Times New Roman">.</font></p>
+
+<H1>Utilities</H1>
+
+<p align="justify"><font size="2" face="Times New Roman">Streams, being 
+the signature structured data type of functional programming languages, 
+find useful expression in conjunction with higher-order functions.  
+Some of these higher-order functions, and their relationship to streams, 
+are described below.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The identity 
+and constant procedures are frequently useful as the recursive base 
+for maps and folds; </font><font size="2" face="Courier New"><b>(identity </b></font><font size="2" face="Times New Roman"><b><i>obj</i></b></font><font size="2" face="Courier New"><b>)</b></font><font size="2" face="Times New Roman"> always returns <i>obj</i>, and </font><font size="2" face="Courier New"><b>(const </b></font><font size="2" face="Times New Roman"><b><i>obj</i></b></font><font size="2" face="Courier New"><b>)</b></font><font size="2" face="Times New Roman"> 
+creates a procedure that takes any number of arguments and always returns 
+the same <i>obj</i>, no matter its arguments:</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(define (identity 
+obj) obj)</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(define (const 
+obj) (lambda x obj))</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Many of the 
+stream procedures take a unary predicate that accepts an element of 
+a stream and returns a boolean.  Procedure </font><font size="2" face="Courier New"><b>(negate </b></font><font size="2" face="Times New Roman"><b><i>pred?</i></b></font><font size="2" face="Courier New"><b>)</b></font><font size="2" face="Times New Roman"> takes a unary predicate and returns 
+a new unary predicate that, when called, returns the opposite boolean 
+value as the original predicate.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (negate pred?)
+  (lambda (x) (not (pred? x))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Courier New">Negate</font><font size="2" face="Times New Roman"> is useful for procedures like </font><font size="2" face="Courier New">stream-take-while</font><font size="2" face="Times New Roman"> 
+that take a predicate, allowing them to be used in the opposite direction 
+from which they were written; for instance, with the predicate reversed, </font><font size="2" face="Courier New">stream-take-while</font><font size="2" face="Times New Roman"> 
+becomes </font><font size="2" face="Courier New">stream-take-until</font><font size="2" face="Times New Roman">.  </font><font size="2" face="Courier New">Stream-remove</font><font size="2" face="Times New Roman"> is the opposite of </font><font size="2" face="Courier New">stream-filter</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-remove pred? strm)
+  (stream-filter (negate pred?) strm))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">A section is 
+a procedure which has been partially applied to some of its arguments; 
+for instance, </font><font size="2" face="Courier New">(double </font><font size="2" face="Times New Roman"><i>x</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman">, which returns twice its argument, 
+is a partial application of the multiply operator to the number </font><font size="2" face="Courier New">2</font><font size="2" face="Times New Roman">.  
+Sections come in two kinds: left sections partially apply arguments 
+starting from the left, and right sections partially apply arguments 
+starting from the right.  Procedure </font><font size="2" face="Courier New"><b>(lsec </b></font><font size="2" face="Times New Roman"><b><i>proc</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>args</i></b></font><font size="2" face="Courier New"><b> 
+...)</b></font><font size="2" face="Times New Roman"> takes a <i>proc</i>edure 
+and some prefix of its arguments and returns a new procedure in which 
+those arguments are partially applied.  Procedure </font><font size="2" face="Courier New"><b>(rsec </b></font><font size="2" face="Times New Roman"><b><i>proc</i></b></font><font size="2" face="Courier New"><b> </b></font><font size="2" face="Times New Roman"><b><i>args</i></b></font><font size="2" face="Courier New"><b> 
+...)</b></font><font size="2" face="Times New Roman"> takes a <i>proc</i>edure 
+and some reversed suffix of its arguments and returns a new procedure 
+in which those arguments are partially applied.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (lsec proc . args)
+  (lambda x (apply proc (append args x))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (rsec proc . args)
+  (lambda x (apply proc (reverse
+    (append (reverse args) (reverse x))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Since most 
+of the stream procedures take a stream as their last (right-most) argument, 
+left sections are particularly useful in conjunction with streams.</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(define stream-sum 
+(lsec stream-fold + 0))</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Function composition 
+creates a new function by partially applying multiple functions, one 
+after the other.  In the simplest case there are only two functions, </font><font size="2" face="Courier New">f</font><font size="2" face="Times New Roman"> 
+and </font><font size="2" face="Courier New">g</font><font size="2" face="Times New Roman">, 
+composed as </font><font size="2" face="Courier New">((compose f g) &equiv; <i>x</i></font><font size="2" face="Courier New">))</font><font size="2" face="Times New Roman">; 
+the composition can be bound to create a new function, as in </font><font size="2" face="Courier New">(define fg (compose f g))</font><font size="2" face="Times New Roman">.  
+Procedure </font><font size="2" face="Courier New"><b>(compose </b></font><font size="2" face="Times New Roman"><b><i>proc</i></b></font><font size="2" face="Courier New"><b> 
+...)</b></font><font size="2" face="Times New Roman"> takes one or more <i>
+proc</i>edures and returns a new procedure that performs the same action 
+as the individual procedures would if called in succession.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (compose . fns)
+  (let comp ((fns fns))
+    (cond
+      ((null? fns) &#39;error)
+      ((null? (cdr fns)) (car fns))
+      (else
+        (lambda args
+          (call-with-values
+            (lambda ()
+              (apply
+                (comp (cdr fns))
+                args))
+            (car fns)))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Courier New">Compose</font><font size="2" face="Times New Roman"> works with sections to create succinct 
+but highly expressive procedure definitions.  The expression to 
+compute the squares of the integers from </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman"> to </font><font size="2" face="Courier New">10</font><font size="2" face="Times New Roman"> given above at </font><font size="2" face="Courier New">stream-unfold</font><font size="2" face="Times New Roman"> could be written by composing </font><font size="2" face="Courier New">stream-map</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">stream-take-while</font><font size="2" face="Times New Roman">, 
+and </font><font size="2" face="Courier New">stream-iterate</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+((compose
+  (lsec stream-map (rsec expt 2))
+  (lsec stream-take-while (negate (rsec &gt; 10)))
+  (lsec stream-iterate (rsec + 1)))
+ 1)</pre></font></p>
+
+<H1>Examples</H1>
+
+<p align="justify"><font size="2" face="Times New Roman">The examples 
+below show a few of the myriad ways streams can be exploited, as well 
+as a few ways they can trip the unwary user.  All the examples 
+are drawn from published sources; it is instructive to compare the Scheme 
+versions to the originals in other languages.</font></p>
+
+<H2>Infinite streams</H2>
+
+<p align="justify"><font size="2" face="Times New Roman">As a simple 
+illustration of infinite streams, consider this definition of the natural 
+numbers:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define nats
+  (stream-cons 0
+    (stream-map add1 nats)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The recursion 
+works because it is offset by one from the initial </font><font size="2" face="Courier New">stream-cons</font><font size="2" face="Times New Roman">.  Another sequence that uses 
+the offset trick is this definition of the fibonacci numbers:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define fibs
+  (stream-cons 1
+    (stream-cons 1
+      (stream-map +
+        fibs
+        (stream-cdr fibs)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Yet another 
+sequence that uses the same offset trick is the Hamming numbers, named 
+for the mathematician and computer scientist Richard Hamming, defined 
+as all numbers that have no prime factors greater than 5; in other words, 
+Hamming numbers are all numbers expressible as 2<sup><i>i</i></sup>&middot;3<sup><i>j</i></sup>&middot;5<sup><i>k</i></sup>, 
+where <i>i</i>, <i>j</i> and <i>k</i> are non-negative integers.  The 
+Hamming sequence starts with </font><font size="2" face="Courier New">1 
+2 3 4 5 6 8 9 10 12</font><font size="2" face="Times New Roman"> and 
+is computed starting with </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman">, taking </font><font size="2" face="Courier New">2</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">3</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">5</font><font size="2" face="Times New Roman"> times all the previous elements with </font><font size="2" face="Courier New">stream-map</font><font size="2" face="Times New Roman">, 
+then merging sub-streams and eliminating duplicates.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define hamming
+  (stream-cons 1
+    (stream-unique =
+      (stream-merge &lt;
+        (stream-map (lsec * 2) hamming)
+        (stream-map (lsec * 3) hamming)
+        (stream-map (lsec * 5) hamming)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">It is possible 
+to have an infinite stream of infinite streams.  Consider the definition 
+of </font><font size="2" face="Courier New">power-table</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define power-table
+  (stream-of
+    (stream-of (expt m n)
+      (m in (stream-from 1)))
+      (n in (stream-from 2))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">which evaluates 
+to an infinite stream of infinite streams:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream
+  (stream 1 4 9 16 25 ...)
+  (stream 1 8 27 64 125 ...)
+  (stream 1 16 81 256 625 ...)
+  ...)</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">But even though 
+it is impossible to display </font><font size="2" face="Courier New">power-table</font><font size="2" face="Times New Roman"> in its entirety, it is possible to 
+select just part of it:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-&gt;list 10 (stream-ref power-table 1))
+  &rArr; (1 8 27 64 125 216 343 512 729 1000)</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">This example 
+clearly shows that the elements of a stream are computed lazily, as 
+they are needed; </font><font size="2" face="Courier New">(stream-ref 
+power-table 0)</font><font size="2" face="Times New Roman"> is not computed, 
+even when its successor is displayed, since computing it would enter 
+an infinite loop.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Chris Reade 
+shows how to calculate the stream of prime numbers according to the 
+sieve of Eratosthenes, using a method that eliminates multiples of the 
+sifting base with addition rather than division:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define primes (let ()
+  (define-stream (next base mult strm)
+    (let ((first (stream-car strm))
+          (rest (stream-cdr strm)))
+      (cond ((&lt; first mult)
+              (stream-cons first
+                (next base mult rest)))
+            ((&lt; mult first)
+              (next base (+ base mult) strm))
+            (else (next base
+                    (+ base mult) rest)))))
+  (define-stream (sift base strm)
+    (next base (+ base base) strm))
+  (define-stream (sieve strm)
+    (let ((first (stream-car strm))>
+          (rest (stream-cdr strm)))
+      (stream-cons first
+        (sieve (sift first rest)))))
+  (sieve (stream-from 2))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">A final example 
+of infinite streams is a functional pearl from Jeremy Gibbons, David 
+Lester and Richard Bird that enumerates the positive rational numbers 
+without duplicates:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define rats
+  (stream-iterate
+    (lambda (x)
+      (let* ((n (floor x)) (y (- x n)))
+        (/ (- n -1 y))))
+    1))</pre></font></p>
+
+<H2>Backtracking via the stream of successes</H2>
+
+<p align="justify"><font size="2" face="Times New Roman">Philip Wadler 
+describes the <i>stream of successes</i> technique that uses streams 
+to perform backtracking search.   The basic idea is that each procedure 
+returns a stream of possible results, so that its caller can decide 
+which result it wants; an empty stream signals failure, and causes backtracking 
+to a previous choice point.  The stream of successes technique 
+is useful because the program is written as if to simply enumerate all 
+possible solutions; no backtracking is explicit in the code.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The Eight Queens 
+puzzle, which asks for a placement of eight queens on a chessboard so 
+that none of them attack any other, is an example of a problem that 
+can be solved using the stream of successes technique.  The algorithm 
+is to place a queen in the first column of a chessboard; any column 
+is satisfactory.  Then a queen is placed in the second column, 
+in any position not held in check by the queen in the first column.  
+Then a queen is placed in the third column, in any position not held 
+in check by the queens in the first two columns.  And so on, until 
+all eight queens have been placed.  If at any point there is no 
+legal placement for the next queen, backtrack to a different legal position 
+for the previous queens, and try again.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The chessboard 
+is represented as a stream of length <i>m</i>, where there are queens 
+in the first <i>m</i> columns, each position in the stream representing 
+the rank on which the queen appears in that column.  For example, 
+stream </font><font size="2" face="Courier New">4</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">6</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">5</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">2</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">8</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">3</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">7</font><font size="2" face="Times New Roman"> 
+represents the following chessboard:</font></p>
+
+<p align="center"><img src="streams2.jpg" height="205" width="195" alt="Chessboard"></a></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Two queens 
+at column <i>i</i> row <i>j</i> and column <i>m</i> row <i>n</i> check 
+each other if their columns <i>i</i> and <i>m</i> are the same, or if 
+their rows <i>j</i> and <i>n</i> are the same, or if they are on the 
+same diagonal with <i>i</i> + <i>j</i> = <i>m</i> + <i>n</i> or <i>i</i> 
+– <i>j</i> = <i>m</i> – <i>n</i>.  There is no need to test 
+the columns, because the placement algorithm enforces that they differ, 
+so the </font><font size="2" face="Courier New">check?</font><font size="2" face="Times New Roman"> 
+procedure tests if two queens hold each other in check.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (check? i j m n)
+  (or (= j n)
+      (= (+ i j) (+ m n))
+      (= (- i j) (- m n))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The algorithm 
+walks through the columns, extending position <i>p</i> by adding a new 
+queen in row <i>n</i> with </font><font size="2" face="Courier New">(stream-append </font><font size="2" face="Times New Roman"><i>p</i></font><font size="2" face="Courier New"> 
+(stream </font><font size="2" face="Times New Roman"><i>n</i></font><font size="2" face="Courier New">))</font><font size="2" face="Times New Roman">.  </font><font size="2" face="Courier New">Safe?</font><font size="2" face="Times New Roman"> 
+tests if it is safe to do so, using the utility procedure </font><font size="2" face="Courier New">stream-and</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-and strm)
+  (let loop ((strm strm))
+    (cond ((stream-null? strm) #t)
+          ((not (stream-car strm)) #f)
+          (else (loop (stream-cdr strm))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (safe? p n)
+  (let* ((len (stream-length p))
+         (m (+ len 1)))
+    (stream-and
+      (stream-of
+        (not (check? (car ij) (cadr ij) m n))
+          (ij in (stream-zip
+                   (stream-range 1 m)
+                   p))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Procedure </font><font size="2" face="Courier New">(queens </font><font size="2" face="Times New Roman"><i>m</i></font><font size="2" face="Courier New">)</font><font size="2" face="Times New Roman"> 
+returns all the ways that queens can safely be placed in the first <i>
+m</i> columns.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queens m)
+  (if (zero? m)
+      (stream (stream))
+      (stream-of (stream-append p (stream n))
+        (p in (queens (- m 1)))
+        (n in (stream-range 1 9))
+        (safe? p n))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">To see the 
+first solution to the Eight Queens problem, say</font></p>
+<p align="justify"><font size="1" face="Courier New">(stream-&gt;list 
+(stream-car (queens 8)))</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">To see all 
+92 solutions, say</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-&gt;list
+  (stream-map stream-&gt;list
+    (queens 8)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">There is no 
+explicit backtracking in the code.  The </font><font size="2" face="Courier New">stream-of</font><font size="2" face="Times New Roman"> expression in </font><font size="2" face="Courier New">queens</font><font size="2" face="Times New Roman"> returns all possible streams that 
+satisfy </font><font size="2" face="Courier New">safe?</font><font size="2" face="Times New Roman">; 
+implicit backtracking occurs in the recursive call to </font><font size="2" face="Courier New">queens</font><font size="2" face="Times New Roman">.</font></p>
+
+<H2>Generators and co-routines</H2>
+
+<p align="justify"><font size="2" face="Times New Roman">It is possible 
+to model generators and co-routines using streams.  Consider the task, 
+due to Carl Hewitt, of determining if two trees have the same sequence 
+of leaves:</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(same-fringe? = 
+&#39;(1 (2 3)) &#39;((1 2) 3)) &rArr; #t</font></p>
+
+<p align="justify"><font size="1" face="Courier New">(same-fringe? = 
+&#39;(1 2 3) &#39;(1 (3 2))) &rArr; #f</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The simplest 
+solution is to flatten both trees into lists and compare them element-by-element:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (flatten tree)
+  (cond ((null? tree) &#39;())
+        ((pair? (car tree))
+          (append (flatten (car tree))
+                  (flatten (cdr tree))))
+        (else (cons (car tree)
+                    (flatten (cdr tree))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (same-fringe? eql? tree1 tree2)
+  (let loop ((t1 (flatten tree1))
+             (t2 (flatten tree2)))
+    (cond ((and (null? t1) (null? t2)) #t)
+          ((or (null? t1) (null? t2)) #f)
+          ((not (eql? (car t1) (car t2))) #f)
+          (else (loop (cdr t1) (cdr t2))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">That works, 
+but requires time to flatten both trees and space to store the flattened 
+versions; if the trees are large, that can be a lot of time and space, 
+and if the fringes differ, much of that time and space is wasted.</font></p>
+<p align="justify"><font size="2" face="Times New Roman">Hewitt used 
+a generator to flatten the trees one element at a time, storing only 
+the current elements of the trees and the machines needed to continue 
+flattening them, so </font><font size="2" face="Courier New">same-fringe?</font><font size="2" face="Times New Roman"> could stop early if the trees differ.  
+Dorai Sitaram presents both the generator solution and a co-routine 
+solution, which both involve tricky calls to </font><font size="2" face="Courier New">call-with-current-continuation</font><font size="2" face="Times New Roman"> and careful coding to keep them synchronized.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">An alternate 
+solution flattens the two trees to streams instead of lists, which accomplishes 
+the same savings of time and space, and involves code that looks little 
+different than the list solution presented above:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (flatten tree)
+  (cond ((null? tree) stream-null)
+        ((pair? (car tree))
+          (stream-append
+            (flatten (car tree))
+            (flatten (cdr tree))))
+        (else (stream-cons
+                (car tree)
+                (flatten (cdr tree))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (same-fringe? eql? tree1 tree2)
+  (let loop ((t1 (flatten tree1))
+             (t2 (flatten tree2)))
+    (cond ((and (stream-null? t1)
+                (stream-null? t2)) #t)
+          ((or  (stream-null? t1)
+                (stream-null? t2)) #f)
+          ((not (eql? (stream-car t1)
+                      (stream-car t2))) #f)
+          (else (loop (stream-cdr t1)
+                      (stream-cdr t2))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Note that streams, 
+a data structure, replace generators or co-routines, which are control 
+structures, providing a fine example of how lazy streams enhance modularity.</font></p>
+
+<H2>A pipeline of procedures</H2>
+
+<p align="justify"><font size="2" face="Times New Roman">Another way 
+in which streams promote modularity is enabling the use of many small 
+procedures that are easily composed into larger programs, in the style 
+of unix pipelines, where streams are important because they allow a 
+large dataset to be processed one item at a time.  Bird and Wadler 
+provide the example of a text formatter.  Their example uses right-folds:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-fold-right f base strm) 
+  (if (stream-null? strm)
+      base
+      (f (stream-car strm)
+         (stream-fold-right f base
+           (stream-cdr strm)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-fold-right-one f strm)
+  (stream-match strm
+  ((x) x)
+  ((x . xs)
+    (f x (stream-fold-right-one f xs)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Bird and Wadler 
+define text as a stream of characters, and develop a standard package 
+for operating on text, which they derive mathematically (this assumes 
+the line-separator character is a single </font><font size="2" face="Courier New">#\newline</font><font size="2" face="Times New Roman">):</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (breakon a)
+  (stream-lambda (x xss)
+    (if (equal? a x)
+        (stream-append (stream (stream)) xss)
+        (stream-append
+          (stream (stream-append
+              (stream x) (stream-car xss)))
+          (stream-cdr xss)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (lines strm) 
+  (stream-fold-right
+    (breakon #\newline)
+    (stream (stream))
+    strm))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (words strm)
+  (stream-filter stream-pair?
+    (stream-fold-right
+      (breakon #\space)
+      (stream (stream))
+      strm)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (paras strm)
+  (stream-filter stream-pair?
+    (stream-fold-right
+      (breakon stream-null)
+      (stream (stream))
+      strm)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (insert a)
+  (stream-lambda (xs ys)
+    (stream-append xs (stream a) ys)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define unlines
+  (lsec stream-fold-right-one
+    (insert #\newline)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define unwords
+  (lsec stream-fold-right-one
+    (insert #\space)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define unparas
+  (lsec stream-fold-right-one
+    (insert stream-null)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">These versatile 
+procedures can be composed to count words, lines and paragraphs; the </font><font size="2" face="Courier New">normalize</font><font size="2" face="Times New Roman"> 
+procedure squeezes out multiple spaces and blank lines:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define countlines
+  (compose stream-length lines))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define countwords
+  (compose stream-length
+           stream-concat
+           (lsec stream-map words)
+           lines))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define countparas
+  (compose stream-length paras lines))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define parse
+  (compose (lsec stream-map
+             (lsec stream-map words))
+           paras
+           lines))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define unparse
+  (compose unlines
+           unparas
+           (lsec stream-map
+             (lsec stream-map unwords))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define normalize (compose unparse parse))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">More useful 
+than normalization is text-filling, which packs as many words onto each 
+line as will fit.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (greedy m ws)
+  (- (stream-length
+       (stream-take-while (rsec <= m)
+         (stream-scan
+           (lambda (n word)
+             (+ n (stream-length word) 1))
+           -1
+           ws))) 1))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (fill m ws)
+  (if (stream-null? ws)
+      stream-null
+      (let* ((n (greedy m ws))
+             (fstline (stream-take n ws))
+             (rstwrds (stream-drop n ws)))
+        (stream-append
+          (stream fstline)
+          (fill m rstwrds)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define linewords
+  (compose stream-concat
+           (lsec stream-map words)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define textparas
+  (compose (lsec stream-map linewords)
+           paras
+           lines))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (filltext m strm)
+  (unparse (stream-map (lsec fill m) (textparas strm))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">To display <i>
+filename</i> in lines of <i>n</i> characters, say:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-for-each display
+  (filltext </font><font size="1" face="Times New Roman"><i>n</i></font><font size="1" face="Courier New"> (file-&gt;stream </font><font size="1" face="Times New Roman"><i>filename</i></font><font size="1" face="Courier New">)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Though each 
+operator performs only a single task, they can be composed powerfully 
+and expressively.  The alternative is to build a single monolithic 
+procedure for each task, which would be harder and involve repetitive 
+code.  Streams ensure procedures are called as needed.</font></p>
+
+<H2>Persistent data</H2>
+
+<p align="justify"><font size="2" face="Times New Roman">Queues are 
+one of the fundamental data structures of computer science.  In 
+functional languages, queues are commonly implemented using two lists, 
+with the front half of the queue in one list, where the head of the 
+queue can be accessed easily, and the rear half of the queue in reverse 
+order in another list, where new items can easily be added to the end 
+of a queue.  The standard form of such a queue holds that the front 
+list can only be null if the rear list is also null: </font></p>
+
+<p align="justify"><font size="1" face="Courier New">(define queue-null (cons &#39;() &#39;())</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-null? obj)
+  (and (pair? obj) (null? (car obj))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-check f r)
+  (if (null? f)
+      (cons (reverse r) &#39;())
+      (cons f r)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-snoc q x)
+  (queue-check (car q) (cons x (cdr q))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-head q)
+  (if (null? (car q))
+      (error &quot;empty queue: head&quot;)
+      (car (car q))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-tail q)
+  (if (null? (car q))
+      (error &quot;empty-head: tail&quot;)
+      (queue-check (cdr (car q)) (cdr q))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">This queue 
+operates in amortized constant time per operation, with two conses per 
+element, one when it is added to the rear list, and another when the 
+rear list is reversed to become the front list.  </font><font size="2" face="Courier New">Queue-snoc</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">queue-head</font><font size="2" face="Times New Roman"> operate in constant time; </font><font size="2" face="Courier New">queue-tail</font><font size="2" face="Times New Roman"> 
+operates in worst-case linear time when the front list is empty.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Chris Okasaki 
+points out that, if the queue is used persistently, its time-complexity 
+rises from linear to quadratic since each persistent copy of the queue 
+requires its own linear-time access.  The problem can be fixed 
+by implementing the front and rear parts of the queue as streams, rather 
+than lists, and rotating one element from rear to front whenever the 
+rear list is larger than the front list: </font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define queue-null
+  (cons stream-null stream-null))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-null? x)
+  (and (pair? x) (stream-null (car x))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-check f r)
+  (if (< (stream-length r) (stream-length f))
+      (cons f r)
+      (cons (stream-append f (stream-reverse r))
+            stream-null)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-snoc q x)
+  (queue-check (car q) (stream-cons x (cdr q))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-head q)
+  (if (stream-null? (car q))
+      (error "empty queue: head")
+      (stream-car (car q))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (queue-tail q)
+  (if (stream-null? (car q))
+      (error "empty queue: tail")
+      (queue-check (stream-cdr (car q))
+                   (cdr q))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Memoization 
+solves the persistence problem; once a queue element has moved from 
+rear to front, it need never be moved again in subsequent traversals 
+of the queue.  Thus, the linear time-complexity to access all elements 
+in the queue, persistently, is restored. </font></p>
+
+<H2>Reducing two passes to one</H2>
+
+<p align="justify"><font size="2" face="Times New Roman">The final example 
+is a lazy dictionary, where definitions and uses may occur in any order; 
+in particular, uses may precede their corresponding definitions.  
+This is a common problem.  Many programming languages allow procedures 
+to be used before they are defined.  Macro processors must collect 
+definitions and emit uses of text in order.  An assembler needs 
+to know the address that a linker will subsequently give to variables.  
+The usual method is to make two passes over the data, collecting the 
+definitions on the first pass and emitting the uses on the second pass.  
+But Chris Reade shows how streams allow the dictionary to be built lazily, 
+so that only a single pass is needed.  Consider a stream of requests:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define requests
+  (stream
+    '(get 3)
+    '(put 1 "a")    &#59; use follows definition
+    '(put 3 "c")    &#59; use precedes definition
+    '(get 1)
+    '(get 2)
+    '(put 2 "b")    &#59; use precedes definition
+    '(put 4 "d")))  &#59; unused definition</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">We want a procedure 
+that will display </font><font size="2" face="Courier New">cab</font><font size="2" face="Times New Roman">, which is the result of </font><font size="2" face="Courier New">(get 3)</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">(get 1)</font><font size="2" face="Times New Roman">, 
+and </font><font size="2" face="Courier New">(get 2)</font><font size="2" face="Times New Roman">, 
+in order.  We first separate the request stream into </font><font size="2" face="Courier New">gets</font><font size="2" face="Times New Roman"> 
+and </font><font size="2" face="Courier New">puts</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (get? obj) (eq? (car obj) 'get))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (gets strm)
+  (stream-map cadr (stream-filter get? strm)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (puts strm)
+  (stream-map cdr  (stream-remove get? strm)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Now, </font><font size="2" face="Courier New">run-dict</font><font size="2" face="Times New Roman"> 
+inserts each element of the </font><font size="2" face="Courier New">puts</font><font size="2" face="Times New Roman"> stream into a lazy dictionary, represented 
+as a stream of key/value pairs (an association stream), then looks up 
+each element of the </font><font size="2" face="Courier New">gets</font><font size="2" face="Times New Roman"> stream with </font><font size="2" face="Courier New">stream-assoc</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (run-dict requests)
+  (let ((dict (build-dict (puts requests))))
+    (stream-map (rsec stream-assoc dict)
+      (gets requests))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-assoc key dict)
+    (cond ((stream-null? dict) #f)
+          ((equal? key (car (stream-car dict)))
+            (stream-car dict))
+          (else (stream-assoc key
+                  (stream-cdr dict)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Courier New">Dict</font><font size="2" face="Times New Roman"> is created in the </font><font size="2" face="Courier New">let</font><font size="2" face="Times New Roman">, but nothing is initially added to 
+it.  Each time </font><font size="2" face="Courier New">stream-assoc</font><font size="2" face="Times New Roman"> performs a lookup, enough of </font><font size="2" face="Courier New">dict</font><font size="2" face="Times New Roman"> 
+is built to satisfy the lookup, but no more.  We are assuming that 
+each item is defined once and only once.  All that is left is to 
+define the procedure that inserts new items into the dictionary, lazily:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (build-dict puts)
+  (if (stream-null? puts)
+      stream-null
+      (stream-cons
+        (stream-car puts)
+        (build-dict (stream-cdr puts)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Now we can 
+run the requests and print the result:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-for-each display
+  (stream-map cadr (run-dict requests)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The </font><font size="2" face="Courier New">(put 4 &quot;d&quot;)</font><font size="2" face="Times New Roman"> 
+definition is never added to the dictionary because it is never needed.</font></p>
+
+<H2>Pitfalls</H2>
+
+<p align="justify"><font size="2" face="Times New Roman">Programming 
+with streams, or any lazy evaluator, can be tricky, even for programmers 
+experienced in the genre.  Programming with streams is even worse 
+in Scheme than in a purely functional language, because, though the 
+streams are lazy, the surrounding Scheme expressions in which they are 
+embedded are eager.  The impedance between lazy and eager can occasionally 
+lead to astonishing results.  Thirty-two years ago, William Burge 
+warned:</font></p>
+
+<ul><p align="justify"><font size="2" face="Times New Roman">Some care 
+must be taken when a stream is produced to make sure that its elements 
+are not really a list in disguise, in other words, to make sure that 
+the stream elements are not materialized too soon.</font></p></ul>
+
+<p align="justify"><font size="2" face="Times New Roman">For example, 
+a simple version of </font><font size="2" face="Courier New">stream-map</font><font size="2" face="Times New Roman"> that returns a stream built by applying 
+a unary procedure to the elements of an input stream could be defined 
+like this:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-map proc strm) &#59;wrong!
+  (let loop ((strm strm))
+    (if (stream-null? strm)
+        stream-null
+        (stream-cons
+          (proc (stream-car strm))
+          (loop (stream-cdr strm))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">That looks 
+right.  It properly wraps the procedure in </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman">, and the two legs of the </font><font size="2" face="Courier New">if</font><font size="2" face="Times New Roman"> 
+both return streams, so it type-checks.  But it fails because the 
+named </font><font size="2" face="Courier New">let</font><font size="2" face="Times New Roman"> 
+binds </font><font size="2" face="Courier New">loop</font><font size="2" face="Times New Roman"> 
+to a procedure using normal </font><font size="2" face="Courier New">lambda</font><font size="2" face="Times New Roman"> rather than </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman">, so even though the first element 
+of the result stream is lazy, subsequent elements are eager.  S</font><font size="2" face="Courier New">tream-map</font><font size="2" face="Times New Roman"> 
+can be written using </font><font size="2" face="Courier New">stream-let</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-map proc strm)
+  (stream-let loop ((strm strm))
+    (if (stream-null? strm)
+        stream-null
+        (stream-cons
+          (proc (stream-car strm))
+          (loop (stream-cdr strm))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Here, </font><font size="2" face="Courier New">stream-let</font><font size="2" face="Times New Roman"> 
+assures that each element of the result stream is properly delayed, 
+because each is subject to the </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman"> that is implicit in </font><font size="2" face="Courier New">stream-let</font><font size="2" face="Times New Roman">, so the result is truly a stream, 
+not a “list in disguise.”  Another version of this procedure 
+was given previously at the description of </font><font size="2" face="Courier New">define-stream</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Another common 
+problem occurs when a stream-valued procedure requires the next stream 
+element in its definition.  Consider this definition of </font><font size="2" face="Courier New">stream-unique</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define-stream (stream-unique eql? strm) &#59;wrong!
+  (stream-match strm
+    (() strm)
+    ((_) strm)
+    ((a b . _)
+      (if (eql? a b)
+          (stream-unique eql?
+            (stream-cdr strm))
+          (stream-cons a
+            (stream-unique eql?
+              (stream-cdr strm)))))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The </font><font size="2" face="Courier New">(a b . _)</font><font size="2" face="Times New Roman"> 
+pattern requires the value of the next stream element after the one 
+being considered.  Thus, to compute the <i>n</i><sup>th</sup> element 
+of the stream, one must know the <i>n</i>+1<sup>st</sup> element, and 
+to compute the <i>n</i>+1<sup>st</sup> element, one must know the <i>
+n</i>+2<sup>nd</sup> element, and to compute….  The correct version, 
+given above in the description of </font><font size="2" face="Courier New">stream-drop-while</font><font size="2" face="Times New Roman">, only needs the current stream element.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">A similar problem 
+occurs when the stream expression uses the previous element to compute 
+the current element:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (nat n)
+  (stream-ref
+    (stream-let loop ((s (stream 0)))
+      (stream-cons (stream-car s)
+        (loop (stream (add1 (stream-car s))))))
+    n))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">This program 
+traverses the stream of natural numbers, building the stream as it goes.  
+The definition is correct; </font><font size="2" face="Courier New">(nat 
+15)</font><font size="2" face="Times New Roman"> evaluates to </font><font size="2" face="Courier New">15</font><font size="2" face="Times New Roman">.  
+But it needlessly uses unbounded space because each stream element holds 
+the value of the prior stream element in the binding to </font><font size="2" face="Courier New">s</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">When traversing 
+a stream, it is easy to write the expression in such a way that evaluation 
+requires unbounded space, even when that is not strictly necessary.  
+During the discussion of SRFI-40, Joe Marshall created this infamous 
+procedure:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (times3 n)
+  (stream-ref
+    (stream-filter
+      (lambda (x)
+        (zero? (modulo x n)))
+      (stream-from 0))
+    3))</pre></font></p>
+
+<p align="justify"><font size="2" face="Courier New">(times3 5)</font><font size="2" face="Times New Roman"> evaluates to </font><font size="2" face="Courier New">15</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">(times3 
+#e1#9)</font><font size="2" face="Times New Roman"> evaluates to three 
+billion, though it takes a while.  In either case, </font><font size="2" face="Courier New">times3</font><font size="2" face="Times New Roman"> 
+should operate in bounded space, since each iteration mutates the promise 
+that holds the next value.  But it is easy to write </font><font size="2" face="Courier New">times3</font><font size="2" face="Times New Roman"> 
+so that it does not operate in bounded space, as the follies of SRFI-40 
+showed.  The common problem is that some element of the stream 
+(often the first element) is bound outside the expression that is computing 
+the stream, so it holds the head of the stream, which holds the second 
+element, and so on.  In addition to testing the programmer, this 
+procedure tests the stream primitives (it caught several errors during 
+development) and also tests the underlying Scheme system (it found a 
+bug in one implementation).</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Laziness is 
+no defense against an infinite loop; for instance, the expression below 
+never returns, because the </font><font size="2" face="Courier New">odd?</font><font size="2" face="Times New Roman"> predicate never finds an odd stream 
+element.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-null?
+  (stream-filter odd?
+    (stream-from 0 2)))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Ultimately, 
+streams are defined as promises, which are implemented as thunks (lambda 
+with no arguments).  Since a stream is a procedure, comparisons 
+such as </font><font size="2" face="Courier New">eq?</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">eqv?</font><font size="2" face="Times New Roman"> 
+and </font><font size="2" face="Courier New">equal?</font><font size="2" face="Times New Roman"> 
+are not meaningful when applied to streams.  For instance, the 
+expression </font><font size="2" face="Courier New">(define s ((lambda 
+() stream-null)))</font><font size="2" face="Times New Roman"> defines </font><font size="2" face="Courier New">s</font><font size="2" face="Times New Roman"> 
+as the null stream, and </font><font size="2" face="Courier New">(stream-null? 
+s)</font><font size="2" face="Times New Roman"> is </font><font size="2" face="Courier New">#t</font><font size="2" face="Times New Roman">, but </font><font size="2" face="Courier New">(eq? 
+s stream-null)</font><font size="2" face="Times New Roman"> is </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman">.  
+To determine if two streams are equal, it is necessary to evaluate the 
+elements in their common prefixes, reporting </font><font size="2" face="Courier New">#f</font><font size="2" face="Times New Roman"> if two elements ever differ and </font><font size="2" face="Courier New">#t</font><font size="2" face="Times New Roman"> 
+if both streams are exhausted at the same time.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define (stream-equal? eql? xs ys)
+  (cond ((and (stream-null? xs)
+              (stream-null? ys)) #t)
+        ((or (stream-null? xs)
+             (stream-null? ys)) #f)
+        ((not (eql? (stream-car xs)
+                    (stream-car ys))) #f)
+        (else (stream-equal? eql?
+                (stream-cdr xs)
+                (stream-cdr ys)))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">It is generally 
+not a good idea to mix lazy streams with eager side-effects, because 
+the order in which stream elements are evaluated determines the order 
+in which the side-effects occur.  For a simple example, consider 
+this side-effecting version of </font><font size="2" face="Courier New">strm123</font><font size="2" face="Times New Roman">:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(define strm123-with-side-effects
+  (stream-cons (begin (display &quot;one&quot;) 1)
+    (stream-cons (begin (display &quot;two&quot;) 2)
+      (stream-cons (begin (display &quot;three&quot;) 3)
+        stream-null))))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The stream 
+has elements </font><font size="2" face="Courier New">1</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">2</font><font size="2" face="Times New Roman"> </font><font size="2" face="Courier New">3</font><font size="2" face="Times New Roman">.  
+But depending on the order in which stream elements are accessed, </font><font size="2" face="Courier New">&quot;one&quot;</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">&quot;two&quot;</font><font size="2" face="Times New Roman"> 
+and </font><font size="2" face="Courier New">&quot;three&quot;</font><font size="2" face="Times New Roman"> could be printed in any order.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Since the performance 
+of streams can be very poor, normal (eager) lists should be preferred 
+to streams unless there is some compelling reason to the contrary.  
+For instance, computing pythagorean triples with streams</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(stream-ref
+  (stream-of (list a b c)
+    (n in (stream-from 1))
+    (a in (stream-range 1 n))
+    (b in (stream-range a n))
+    (c is (- n a b))
+    (= (+ (* a a) (* b b)) (* c c)))
+  50)</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">is about two 
+orders of magnitude slower than the equivalent expression using loops.</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+(do ((n 1 (+ n 1))) ((&gt; n 228))
+  (do ((a 1 (+ a 1))) ((&gt; a n))
+    (do ((b a (+ b 1))) ((&gt; b n))
+      (let ((c (- n a b)))
+        (if (= (+ (* a a) (* b b)) (* c c)))
+            (display (list a b c)))))))</pre></font></p>
+
+<H1>Implementation</H1>
+
+<p align="justify"><font size="2" face="Times New Roman">Bird and Wadler 
+describe streams as either null or a pair with a stream in the tail:</font></p>
+
+<p align="justify"><font size="1" face="Courier New">
+&alpha; list :: null | &alpha; * &alpha; list</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">That works 
+in a purely functional language such as Miranda (on which their book 
+was based) or Haskell because the entire language is lazy.  In 
+an eager language like ML or Scheme, of course, it’s just a normal, 
+eager list.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Using ML, Wadler, 
+Taha and MacQueen give the type of even streams as:</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+datatype &#39;a stream_
+  = Nil_
+  | Cons_ of &#39;a * &#39;a stream
+withtype &#39;a stream
+  = &#39;a stream_ susp;</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Their </font><font size="2" face="Courier New">susp</font><font size="2" face="Times New Roman"> 
+type is similar to Scheme’s </font><font size="2" face="Courier New">promise</font><font size="2" face="Times New Roman"> type.  Since Scheme conflates 
+the notions of record and type (the only way to create a new type disjoint 
+from all other types is to create a record), it is necessary to distribute 
+the suspension through the two constructors of the stream data type:</font></p>
+
+<p><font size="1" face="Courier New"><pre>
+&alpha; stream
+  :: (promise stream-null)
+  |  (promise (&alpha; stream-pair))</pre></font></p>
+
+<p><font size="1" face="Courier New"><pre>
+&alpha; stream-pair
+  :: &alpha; × (&alpha; stream)</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">That type captures 
+the systematic suspension of recursive promises that is the essence 
+of “streamness.”  But it doesn’t quite work, because Scheme 
+is eager rather than lazy, and both the car and the cdr of the stream 
+are evaluated too early.  So the final type of streams delays both 
+the car and the cdr of the stream-pair:</font></p>
+
+<p><font size="1" face="Courier New"><pre>
+&alpha; stream
+  :: (promise stream-null)
+  |  (promise (&alpha; stream-pair))</pre></font></p>
+
+<p><font size="1" face="Courier New"><pre>
+&alpha; stream-pair
+  :: (promise &alpha;) × (promise (&alpha; stream))</pre></font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">The two outer 
+promises, in the </font><font size="2" face="Courier New">stream</font><font size="2" face="Times New Roman"> type, provide streams without memoization.  
+The two inner promises, in the </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman"> type, add the memoization that is 
+characteristic of streams in modern functional languages.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Lists provide 
+seven primitive operations: the two constructors </font><font size="2" face="Courier New">&#39;()</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">cons</font><font size="2" face="Times New Roman">, the type predicates </font><font size="2" face="Courier New">list?</font><font size="2" face="Times New Roman">, </font><font size="2" face="Courier New">null?</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">pair?</font><font size="2" face="Times New Roman">, and the accessors </font><font size="2" face="Courier New">car</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">cdr</font><font size="2" face="Times New Roman"> for pairs.  All other list operations 
+can be derived from those primitives.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">It would seem 
+that the same set of primitives could apply to streams, but in fact 
+one additional primitive is required.  André von Tonder describes 
+the reason in his discussion of the promise data type.  The promises 
+of R6RS are inadequate to support iterative algorithms because each 
+time a promise is called iteratively it binds the old promise in the 
+closure that defines the new promise (so the old promise can be forced 
+later, if requested).  However, in the case of iteration, the old 
+promise becomes unreachable, so instead of creating a new promise that 
+binds the old promise within, it is better to mutate the promise; that 
+way, no space is wasted by the old promise.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Von Tonder 
+describes this new promise type, and provides a recipe for its use: 
+all constructors are wrapped with </font><font size="2" face="Courier New">delay</font><font size="2" face="Times New Roman">, all accessors are wrapped with </font><font size="2" face="Courier New">force</font><font size="2" face="Times New Roman">, 
+and all function bodies are wrapped with </font><font size="2" face="Courier New">lazy</font><font size="2" face="Times New Roman">.  Given the seven primitives 
+above, the first two parts of von Tonder’s recipe are simple: the 
+two constructors </font><font size="2" face="Courier New">stream-null</font><font size="2" face="Times New Roman"> and </font><font size="2" face="Courier New">stream-pair</font><font size="2" face="Times New Roman"> hide </font><font size="2" face="Courier New">delay</font><font size="2" face="Times New Roman">, and the two accessors </font><font size="2" face="Courier New">stream-car</font><font size="2" face="Times New Roman"> 
+and </font><font size="2" face="Courier New">stream-cdr</font><font size="2" face="Times New Roman"> 
+hide </font><font size="2" face="Courier New">force</font><font size="2" face="Times New Roman"> 
+(</font><font size="2" face="Courier New">stream-null?</font><font size="2" face="Times New Roman"> 
+and </font><font size="2" face="Courier New">stream-pair?</font><font size="2" face="Times New Roman"> also hide </font><font size="2" face="Courier New">force</font><font size="2" face="Times New Roman">, so they can distinguish the two elements 
+of the stream type).</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Although the 
+new promise type prevents a space leak, it creates a new problem: there 
+is no place to hide the </font><font size="2" face="Courier New">lazy</font><font size="2" face="Times New Roman"> that is the third part of von Tonder’s 
+recipe.  SRFI-40 solved this problem by exposing it (actually, 
+it exposed </font><font size="2" face="Courier New">delay</font><font size="2" face="Times New Roman">, which was incorrect).  But that 
+violates good software engineering practice by preventing the stream 
+data type from being fully abstract.  The solution of SRFI-41 is 
+to create a new primitive, </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman">, that returns a function that hides </font><font size="2" face="Courier New">lazy</font><font size="2" face="Times New Roman">.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Besides hiding </font><font size="2" face="Courier New">lazy</font><font size="2" face="Times New Roman"> 
+and making the types work out correctly, </font><font size="2" face="Courier New">stream-lambda</font><font size="2" face="Times New Roman"> is obvious and easy-to-use for competent 
+Scheme programmers, especially when augmented with the syntactic sugar 
+of </font><font size="2" face="Courier New">define-stream</font><font size="2" face="Times New Roman"> and named </font><font size="2" face="Courier New">stream-let</font><font size="2" face="Times New Roman">.  The alternative of exposing </font><font size="2" face="Courier New">stream-lazy</font><font size="2" face="Times New Roman"> 
+would be less clear and harder to use.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">One of the 
+hardest tasks when writing any program library is to decide what to 
+include and, more importantly, what to exclude.  One important 
+guideline is minimalism, since once an operator enters a library it 
+must remain forever: <i>Il semble que la perfection soit atteinte non 
+quand il n’y a plus rien à ajouter, mais quand il n’y a plus rien 
+à retrancher</i>.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Since streams 
+are substantially slower than lists (the stream primitives require numerous 
+type conversions, and list operations in most Scheme implementations 
+are heavily optimized), most programmers will use streams only when 
+the sequence of elements is truly infinite (such as mathematical series) 
+or when there is some clear advantage of laziness (such as reducing 
+the number of passes though a large data set).  Thus, the library 
+is biased toward functions that work with infinite streams left-to-right.  
+There is no right-fold; if you need to materialize an entire stream, 
+it’s best to use a list.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">A version of the
+implementation suitable for use in R5RS is available at</font><font size="2" face="Courier New">
+<a href="streams.ss">streams.ss</a></font><font size="2" face="Times New Roman">.</font></p>
+
+<H2>Implementation of <font face="Courier New">stream-primitives</font></H2>
+
+<p align="justify"><font size="1" face="Courier New">(library stream-primitives</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (export stream-null stream-cons stream? stream-null? stream-pair?
+          stream-car stream-cdr stream-lambda)</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (import (rnrs))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-record-type (stream-type make-stream stream?)
+    (fields (mutable box stream-promise stream-promise!)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-lazy
+    (syntax-rules ()
+      ((lazy expr)
+        (make-stream
+          (cons 'lazy (lambda () expr))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-eager expr)
+    (make-stream
+      (cons 'eager expr)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-delay
+    (syntax-rules ()
+      ((stream-delay expr)
+        (stream-lazy (stream-eager expr)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-force promise)
+    (let ((content (stream-promise promise)))
+      (case (car content)
+        ((eager) (cdr content))
+        ((lazy)  (let* ((promise* ((cdr content)))
+                        (content  (stream-promise promise)))
+                   (if (not (eqv? (car content) 'eager))
+                       (begin (set-car! content (car (stream-promise promise*)))
+                              (set-cdr! content (cdr (stream-promise promise*)))
+                              (stream-promise! promise* content)))
+                   (stream-force promise))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define stream-null (stream-delay (cons 'stream 'null)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-record-type (stream-pare-type make-stream-pare stream-pare?)
+    (fields (immutable kar stream-kar) (immutable kdr stream-kdr)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-pair? obj)
+    (and (stream? obj) (stream-pare? (stream-force obj))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-null? obj)
+    (and (stream? obj)
+         (eqv? (stream-force obj)
+               (stream-force stream-null))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-cons
+    (syntax-rules ()
+      ((stream-cons obj strm)
+        (stream-delay (make-stream-pare (stream-delay obj) (stream-lazy strm))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-car strm)
+    (cond ((not (stream? strm)) (error "attempt to take stream-car of non-stream"))
+          ((stream-null? strm) (error "attempt to take stream-car of null stream"))
+          (else (stream-force (stream-kar (stream-force strm))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-cdr strm)
+    (cond ((not (stream? strm)) (error "attempt to take stream-cdr of non-stream"))
+          ((stream-null? strm) (error "attempt to take stream-cdr of null stream"))
+          (else (stream-kdr (stream-force strm)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-lambda
+    (syntax-rules ()
+      ((stream-lambda formals body0 body1 ...)
+        (lambda formals (stream-lazy (let () body0 body1 ...)))))))</pre></font></p>
+
+<H2>Implementation of <font face="Courier New">stream-derived</font></H2>
+
+<p align="justify"><font size="1" face="Courier New">(library stream-derived</font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (export (stream-null stream-cons stream? stream-null? stream-pair? stream-car
+           stream-cdr stream-lambda define-stream list-&gt;stream port-&gt;stream stream
+           stream-&gt;list stream-append stream-concat stream-constant stream-drop
+           stream-drop-while stream-filter stream-fold stream-for-each stream-from
+           stream-iterate stream-length stream-let stream-map stream-match
+           stream-of stream-range stream-ref stream-reverse stream-scan stream-take
+           stream-take-while stream-unfold stream-unfolds stream-zip))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (import (rnrs) (stream-primitives))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (ormap pred? . lists)
+    (and (not (null? (car lists)))
+         (or (apply pred? (map car lists))
+             (apply ormap pred? (map cdr lists)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax define-stream
+    (syntax-rules ()
+      ((define-stream (name . formal) body0 body1 ...)
+        (define name (stream-lambda formal body0 body1 ...)))
+      ((define-stream (name formals ...) body0 body1 ...)
+        (define name (stream-lambda (formals ...) body0 body1 ...)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (list->stream objs)
+    (define list->stream
+      (stream-lambda (objs)
+        (if (null? objs)
+            stream-null
+            (stream-cons (car objs) (list->stream (cdr objs))))))
+    (if (not (list? objs))
+        (error "non-list argument to list->stream")
+        (list->stream objs)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (port->stream . port)
+    (define port->stream
+      (stream-lambda (p)
+        (let ((c (read-char p)))
+          (if (eof-object? c)
+              stream-null
+              (stream-cons c (port->stream p))))))
+    (let ((p (if (null? port) (current-input-port) (car port))))
+      (if (not (input-port? p))
+          (error "non-input-port argument to port->stream")
+          (port->stream p))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream
+    (syntax-rules ()
+      ((stream) stream-null)
+      ((stream x y ...) (stream-cons x (stream y ...)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream->list . args)
+    (let ((n (if (= 1 (length args)) #f (car args)))
+          (strm (if (= 1 (length args)) (car args) (cadr args))))
+      (cond ((not (stream? strm)) (error "non-stream argument to stream->list"))
+            ((and n (not (integer? n))) (error "non-integer count to stream->list"))
+            ((and n (negative? n)) (error "negative count to stream->list"))
+            (else (let loop ((n (if n n -1)) (strm strm))
+                    (if (or (zero? n) (stream-null? strm))
+                        '()
+                        (cons (stream-car strm) (loop (- n 1) (stream-cdr strm)))))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-append . strms)
+    (define stream-append
+      (stream-lambda (strms)
+        (cond ((null? (cdr strms)) (car strms))
+              ((stream-null? (car strms)) (stream-append (cdr strms)))
+              (else (stream-cons (stream-car (car strms))
+                                 (stream-append (cons (stream-cdr (car strms)) (cdr strms))))))))
+    (cond ((null? strms) stream-null)
+          ((ormap (lambda (x) (not (stream? x))) strms)
+            (error "non-stream argument to stream-append"))
+          (else (stream-append strms))))</pre></font></p>
+  
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-concat strms)
+    (define stream-concat
+      (stream-lambda (strms)
+        (cond ((stream-null? strms) stream-null)
+              ((not (stream? (stream-car strms)))
+                (error "non-stream object in input stream of string-concat"))
+              ((stream-null? (stream-car strms))
+                (stream-concat (stream-cdr strms)))
+              (else (stream-cons
+                      (stream-car (stream-car strms))
+                      (stream-concat
+                        (stream-cons (stream-cdr (stream-car strms)) (stream-cdr strms))))))))
+    (if (not (stream? strms))
+        (error "non-stream argument to stream-concat")
+        (stream-concat strms)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define stream-constant
+    (stream-lambda objs
+      (cond ((null? objs) stream-null)
+            ((null? (cdr objs)) (stream-cons (car objs) (stream-constant (car objs))))
+            (else (stream-cons (car objs)
+                               (apply stream-constant (append (cdr objs) (list (car objs)))))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-drop n strm)
+    (define stream-drop
+      (stream-lambda (n strm)
+        (if (or (zero? n) (stream-null? strm))
+            strm
+            (stream-drop (- n 1) (stream-cdr strm)))))
+    (cond ((not (integer? n)) (error "non-integer argument to stream-drop"))
+          ((negative? n) (error "negative argument to stream-drop"))
+          ((not (stream? strm)) (error "non-stream argument to stream-drop"))
+          (else (stream-drop n strm))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-drop-while pred? strm)
+    (define stream-drop-while
+      (stream-lambda (strm)
+        (if (and (stream-pair? strm) (pred? (stream-car strm)))
+            (stream-drop-while (stream-cdr strm))
+            strm)))
+    (cond ((not (procedure? pred?)) (error "non-procedural argument to stream-drop-while"))
+          ((not (stream? strm)) (error "non-stream argument to stream-drop-while"))
+          (else (stream-drop-while strm))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-filter pred? strm)
+    (define stream-filter
+      (stream-lambda (strm)
+        (cond ((stream-null? strm) stream-null)
+              ((pred? (stream-car strm))
+                (stream-cons (stream-car strm) (stream-filter (stream-cdr strm))))
+              (else (stream-filter (stream-cdr strm))))))
+    (cond ((not (procedure? pred?)) (error "non-procedural argument to stream-filter"))
+          ((not (stream? strm)) (error "non-stream argument to stream-filter"))
+          (else (stream-filter strm))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-fold proc base strm)
+    (cond ((not (procedure? proc)) (error "non-procedural argument to stream-fold"))
+          ((not (stream? strm)) (error "non-stream argument to stream-fold"))
+          (else (let loop ((base base) (strm strm))
+                  (if (stream-null? strm)
+                      base
+                      (loop (proc base (stream-car strm)) (stream-cdr strm)))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-for-each proc . strms)
+    (define (stream-for-each strms)
+      (if (not (ormap stream-null? strms))
+          (begin (apply proc (map stream-car strms))
+                 (stream-for-each (map stream-cdr strms)))))
+    (cond ((not (procedure? proc)) (error "non-procedural argument to stream-for-each"))
+          ((null? strms) (error "no stream arguments to stream-for-each"))
+          ((ormap (lambda (x) (not (stream? x))) strms)
+            (error "non-stream argument to stream-for-each"))
+          (else (stream-for-each strms))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-from first . step)
+    (define stream-from
+      (stream-lambda (first delta)
+        (stream-cons first (stream-from (+ first delta) delta))))
+    (let ((delta (if (null? step) 1 (car step))))
+      (cond ((not (number? first)) (error "non-numeric starting number in stream-from"))
+            ((not (number? delta)) (error "non-numeric step size in stream-from"))
+            (else (stream-from first delta)))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-iterate proc base)
+    (define stream-iterate
+      (stream-lambda (base)
+        (stream-cons base (stream-iterate (proc base)))))
+    (if (not (procedure? proc))
+        (error "non-procedural argument to stream-iterate")
+        (stream-iterate base)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-length strm)
+    (if (not (stream? strm))
+        (error "non-stream argument to stream-length")
+        (let loop ((len 0) (strm strm))
+          (if (stream-null? strm)
+              len
+              (loop (+ len 1) (stream-cdr strm))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-let
+    (syntax-rules ()
+      ((stream-let tag ((name val) ...) body1 body2 ...)
+       ((letrec ((tag (stream-lambda (name ...) body1 body2 ...))) tag) val ...))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-map proc . strms)
+    (define stream-map
+      (stream-lambda (strms)
+        (if (ormap stream-null? strms)
+            stream-null
+            (stream-cons (apply proc (map stream-car strms))
+                         (stream-map (map stream-cdr strms))))))
+    (cond ((not (procedure? proc)) (error "non-procedural argument to stream-map"))
+          ((null? strms) (error "no stream arguments to stream-map"))
+          ((ormap (lambda (x) (not (stream? x))) strms)
+            (error "non-stream argument to stream-map"))
+          (else (stream-map strms))))</pre></font></p>
+  
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-match
+    (syntax-rules ()
+      ((stream-match strm-expr clause ...)
+        (let ((strm strm-expr))
+          (cond
+            ((not (stream? strm)) (error "non-stream argument to stream-match"))
+            ((stream-match-test strm clause) => car) ...
+            (else (error "pattern failure in stream-match")))))))</pre></font></p>
+ 
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-match-test
+    (syntax-rules ()
+      ((stream-match-test strm (pattern fender expr))
+        (stream-match-pattern strm pattern () (and fender (list expr))))
+      ((stream-match-test strm (pattern expr))
+        (stream-match-pattern strm pattern () (list expr)))))</pre></font></p>
+ 
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-match-pattern
+    (syntax-rules (_)
+      ((stream-match-pattern strm () (binding ...) body)
+        (and (stream-null? strm) (let (binding ...) body)))
+      ((stream-match-pattern strm (_ . rest) (binding ...) body)
+        (and (stream-pair? strm)
+             (let ((strm (stream-cdr strm)))
+               (stream-match-pattern strm rest (binding ...) body))))
+      ((stream-match-pattern strm (var . rest) (binding ...) body)
+        (and (stream-pair? strm)
+             (let ((temp (stream-car strm)) (strm (stream-cdr strm)))
+               (stream-match-pattern strm rest ((var temp) binding ...) body))))
+      ((stream-match-pattern strm _ (binding ...) body)
+        (let (binding ...) body))
+      ((stream-match-pattern strm var (binding ...) body)
+        (let ((var strm) binding ...) body))))</pre></font></p>
+  
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-of
+    (syntax-rules ()
+      ((_ expr rest ...)
+        (stream-of-aux expr stream-null rest ...))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define-syntax stream-of-aux
+    (syntax-rules (in is)
+      ((stream-of-aux expr base)
+        (stream-cons expr base))
+      ((stream-of-aux expr base (var in stream) rest ...)
+        (stream-let loop ((strm stream))
+          (if (stream-null? strm)
+              base
+              (let ((var (stream-car strm)))
+                (stream-of-aux expr (loop (stream-cdr strm)) rest ...)))))
+      ((stream-of-aux expr base (var is exp) rest ...)
+        (let ((var exp)) (stream-of-aux expr base rest ...)))
+      ((stream-of-aux expr base pred? rest ...)
+        (if pred? (stream-of-aux expr base rest ...) base))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-range first past . step)
+    (define stream-range
+      (stream-lambda (first past delta lt?)
+        (if (lt? first past)
+            (stream-cons first (stream-range (+ first delta) past delta lt?))
+            stream-null)))
+    (cond ((not (number? first)) (error "non-numeric starting number in stream-range"))
+          ((not (number? past)) (error "non-numeric ending number in stream-range"))
+          (else (let ((delta (cond ((pair? step) (car step)) ((< first past) 1) (else -1))))
+                  (if (not (number? delta))
+                      (error "non-numeric step size in stream-range")
+                      (let ((lt? (if (< 0 delta) < >)))
+                        (stream-range first past delta lt?)))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-ref strm n)
+    (cond ((not (stream? strm)) (error "non-stream argument to stream-ref"))
+          ((not (integer? n)) (error "non-integer argument to stream-ref"))
+          ((negative? n) (error "negative argument to stream-ref"))
+          (else (let loop ((strm strm) (n n))
+                  (cond ((stream-null? strm) (error "attempt to reference beyond end of stream"))
+                        ((zero? n) (stream-car strm))
+                        (else (loop (stream-cdr strm) (- n 1))))))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-reverse strm)
+    (define stream-reverse
+      (stream-lambda (strm rev)
+        (if (stream-null? strm)
+            rev
+            (stream-reverse (stream-cdr strm) (stream-cons (stream-car strm) rev)))))
+    (if (not (stream? strm))
+        (error "non-stream argument to stream-reverse")
+        (stream-reverse strm stream-null)))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-scan proc base strm)
+    (define stream-scan
+      (stream-lambda (base strm)
+        (if (stream-null? strm)
+            (stream base)
+            (stream-cons base (stream-scan (proc base (stream-car strm)) (stream-cdr strm))))))
+    (cond ((not (procedure? proc)) (error "non-procedural argument to stream-scan"))
+          ((not (stream? strm)) (error "non-stream argument to stream-scan"))
+          (else (stream-scan base strm))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-take n strm)
+    (define stream-take
+      (stream-lambda (n strm)
+        (if (or (stream-null? strm) (zero? n))
+            stream-null
+            (stream-cons (stream-car strm) (stream-take (- n 1) (stream-cdr strm))))))
+    (cond ((not (stream? strm)) (error "non-stream argument to stream-take"))
+          ((not (integer? n)) (error "non-integer argument to stream-take"))
+          ((negative? n) (error "negative argument to stream-take"))
+          (else (stream-take n strm))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-take-while pred? strm)
+    (define stream-take-while
+      (stream-lambda (strm)
+        (cond ((stream-null? strm) stream-null)
+              ((pred? (stream-car strm))
+                (stream-cons (stream-car strm) (stream-take-while (stream-cdr strm))))
+              (else stream-null))))
+    (cond ((not (stream? strm)) (error "non-stream argument to stream-take-while"))
+          ((not (procedure? pred?)) (error "non-procedural argument to stream-take-while"))
+          (else (stream-take-while strm))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-unfold mapper pred? generator base)
+    (define stream-unfold
+      (stream-lambda (base)
+        (if (pred? base)
+            (stream-cons (mapper base) (stream-unfold (generator base)))
+            stream-null)))
+    (cond ((not (procedure? mapper)) (error "non-procedural mapper in stream-unfold"))
+          ((not (procedure? pred?)) (error "non-procedural pred? in stream-unfold"))
+          ((not (procedure? generator)) (error "non-procedural generator in stream-unfold"))
+          (else (stream-unfold base))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-unfolds gen seed)
+    (define (len-values gen seed)
+      (call-with-values
+        (lambda () (gen seed))
+        (lambda vs (- (length vs) 1))))
+    (define unfold-result-stream
+      (stream-lambda (gen seed)
+        (call-with-values
+          (lambda () (gen seed))
+          (lambda (next . results)
+            (stream-cons results (unfold-result-stream gen next))))))
+    (define result-stream->output-stream
+      (stream-lambda (result-stream i)
+        (let ((result (list-ref (stream-car result-stream) (- i 1))))
+          (cond ((pair? result)
+                  (stream-cons
+                    (car result)
+                    (result-stream->output-stream (stream-cdr result-stream) i)))
+                ((not result)
+                  (result-stream->output-stream (stream-cdr result-stream) i))
+                ((null? result) stream-null)
+                (else (error "can't happen"))))))
+    (define (result-stream->output-streams result-stream)
+      (let loop ((i (len-values gen seed)) (outputs '()))
+        (if (zero? i)
+            (apply values outputs)
+            (loop (- i 1) (cons (result-stream->output-stream result-stream i) outputs)))))
+    (if (not (procedure? gen))
+        (error "non-procedural argument to stream-unfolds")
+        (result-stream->output-streams (unfold-result-stream gen seed))))</pre></font></p>
+
+<p align="justify"><font size="1" face="Courier New"><pre>
+  (define (stream-zip . strms)
+    (define stream-zip
+      (stream-lambda (strms)
+        (if (ormap stream-null? strms)
+            stream-null
+            (stream-cons (map stream-car strms) (stream-zip (map stream-cdr strms))))))
+    (cond ((null? strms) (error "no stream arguments to stream-zip"))
+          ((ormap (lambda (x) (not (stream? x))) strms)
+            (error "non-stream argument to stream-zip"))
+          (else (stream-zip strms)))))</pre></font></p>
+
+<H1>Acknowledgements</H1>
+
+<p align="justify"><font size="2" face="Times New Roman">Jos Koot sharpened 
+my thinking during many e-mail discussions, suggested several discussion 
+points in the text, and contributed the final version of </font><font size="2" face="Courier New">stream-match</font><font size="2" face="Times New Roman">.  
+Michael Sperber gave advice on R6RS.</font></p>
+
+<H1>References</H1>
+
+<p align="justify"><font size="2" face="Times New Roman">Harold Abelson 
+and Gerald Jay Sussman with Julie Sussman.  <i>Structure and Interpretation 
+of Computer Programs</i>.  MIT Press, Cambridge, Massachusetts.  
+Second edition, 1996.  </font><font size="2" face="Courier New"><a href="http://mitpress.mit.edu/sicp" target="_blank">mitpress.mit.edu/sicp</a></font><font size="2" face="Times New Roman">.  The classic text on computer 
+science.  Section 3.5 includes extensive discussion of odd streams.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Anne L. Bewig.  
+“Golden Ratio” (personal communication).  Homework for the 
+high school course <i>Calculus</i>.  Teaching my daughter how to 
+calculate the 200<sup>th</sup> element of a continued fraction was a 
+moment of sheer joy in the development of the stream libraries.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Philip L. Bewig.  <i>
+Scheme Request for Implementation 40: 
+A Library of Streams</i>.  August, 2004.  </font><font size="2" face="Courier New"><a href="http://srfi.schemers.org/srfi-40" target="_blank">srfi.schemers.org/srfi-40</a></font><font size="2" face="Times New Roman">.  Describes an implementation 
+of the </font><font size="2" face="Courier New">stream</font><font size="2" face="Times New Roman"> 
+data type. </font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Richard Bird 
+and Philip Wadler.  <i>Introduction to Functional Programming</i>.  
+Prentice Hall, 1988.  The classic text on functional programming.  
+Even streams are discussed in the context of purely functional programming.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">William H. 
+Burge.  <i>Recursive Programming Techniques</i>.  Addison-Wesley, 
+1975.  An early text on functional programming, and still one of 
+the best, though the terminology is dated.  Discusses even streams 
+in Section 3.10.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Jeremy Gibbons, 
+David Lester and Richard Bird, “Functional Pearl: Enumerating the 
+Rationals,” under consideration for publication in <i>Journal of Functional 
+Programming</i>.  </font><font size="2" face="Courier New"><a href="http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/rationals.pdf" target="_blank">http://web.comlab.ox.ac.uk<WBR>/oucl/work/jeremy.gibbons<WBR>/publications/rationals.pdf</a></font><font size="2" face="Times New Roman">.  Discusses a series of expressions 
+that enumerate the rational numbers without duplicates.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Carl Hewitt. 
+“Viewing control structures as patterns of passing messages,” in <i>
+Journal of Artificial Intelligence</i>, Volume 8, Number 3 (June, 1977), 
+pp 323-364.  Also published as Artificial Intelligence Memo 410 
+by the Massachusetts Institute of Technology, </font><font size="2" face="Courier New"><a href="ftp://publications.ai.mit.edu/ai-publications/pdf/AIM-410.pdf" target="_blank">ftp://publications.ai.mit.edu<WBR>/ai-publications/pdf/AIM-410<WBR>.pdf</a></font><font size="2" face="Times New Roman">.  Describes the Actor message-passing 
+system; one of the examples used is the </font><font size="2" face="Courier New">same-fringe?</font><font size="2" face="Times New Roman"> problem.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Peter J. Landin.  
+“A correspondence between ALGOL 60 and Church’s lambda-notation: 
+Part I,”  <i>Communications of the ACM</i>, Volume 8, Number 
+2, February 1965., pages 89–101.  The seminal description of 
+streams.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Joe Marshall.  
+“Stream problem redux”, from <i>Usenet 
+comp.lang.scheme</i>, June 28, 2002.  </font><font size="2" face="Courier New"><a href="http://groups.google.com/group/comp.lang.scheme/msg/db4b4a1f33e3eea8" target="_blank">groups.google.com/group/comp<WBR>.lang.scheme/msg/db4b4a1f33e3ee<WBR>a8</a></font><font size="2" face="Times New Roman">.  The original post on </font><font size="2" face="Courier New">comp.lang.scheme</font><font size="2" face="Times New Roman"> 
+that describes the </font><font size="2" face="Courier New">times3</font><font size="2" face="Times New Roman"> problem.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Chris Okasaki.  <i>
+Purely Functional Data Structures</i>.  Cambridge University Press, 
+2003.  Revised version of Okasaki’s thesis <i>Purely Functional 
+Data Structures</i>, Carnegie-Mellon University, 1996, </font><font size="2" face="Courier New"><a href="http://www.cs.cmu.edu/~rwh/theses/okasaki.pdf" target="_blank">www.cs.cmu.edu/~rwh/theses<WBR>/okasaki.pdf</a></font><font size="2" face="Times New Roman">.  Provides a strong defense of 
+laziness, and describes several data structures that exploit laziness, 
+including streams and queues.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Stephen K. 
+Park and Keith W. Miller.  “Random number generators: good ones 
+are hard to find,” <i>Communications of the ACM</i>, Volume 31, Issue 
+10 (October 1988), pages 1192–1201.  Describes a minimal standard 
+random number generator. </font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Simon Peyton-Jones, 
+et al, editors.  <i>Haskell 98: Haskell 98 Language and Libraries: 
+The Revised Report</i>.  December 2002.  </font><font size="2" face="Courier New"><a href="http://www.haskell.org/onlinereport" target="_blank">www.haskell.org/onlinereport</a></font><font size="2" face="Times New Roman">.  Haskell is the prototypical 
+purely functional language, and includes even streams, which it calls 
+lists, as its fundamental structured data type.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Chris Reade.  <i>
+Elements of Functional Programming</i>.  Addison-Wesley, April 
+1989.  A textbook on functional programming.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Antoine de 
+Saint-Exupéry. Chapter III &ldquo;L’Avion&rdquo; of <i>Terre des Hommes</i>.  
+1939.  &ldquo;Perfection is achieved, not when there is nothing more 
+to add, but when there is nothing left to take away.&rdquo;</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Dorai Sitaram.  <i>
+Teach Yourself Scheme in Fixnum Days</i>.  </font><font size="2" face="Courier New"><a href="http://www.ccs.neu.edu/home/dorai/t-y-scheme/t-y-scheme.html" target="_blank">www.ccs.neu.edu/home/dorai/t-y<WBR>-scheme/t-y-scheme.html</a></font><font size="2" face="Times New Roman">.  A useful introduction to Scheme; 
+includes generator and co-routine solutions to the </font><font size="2" face="Courier New">same-fringe?</font><font size="2" face="Times New Roman"> problem.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Michael Sperber, 
+R. Kent Dybvig, Matthew Flatt, and Anton von Straaten, editors.  <i>
+
+Revised</i><sup><i>6</i></sup><i> Report on the Algorithmic Language 
+Scheme</i>.  September 26, 2007. </font><font size="2" face="Courier New"><a href="http://www.r6rs.org" target="_blank">www.r6rs.org</a></font><font size="2" face="Times New Roman">.  The standard definition of 
+the Scheme programming language.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">André von 
+Tonder.  <i>Scheme Request for Implementation 45: 
+Primitives for Expressing Iterative Lazy Algorithms</i>.  </font><font size="2" face="Courier New"><a href="http://srfi.schemers.org/srfi-45" target="_blank">srfi.schemers.org/srfi-45</a></font><font size="2" face="Times New Roman">.  
+April, 2004.  Describes the problems inherent in the </font><font size="2" face="Courier New">promise</font><font size="2" face="Times New Roman"> 
+data type of R5RS (also present in R6RS), and provides the alternate </font><font size="2" face="Courier New">promise</font><font size="2" face="Times New Roman"> 
+data type used in the stream primitives.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Philip Wadler.  
+“How to replace failure by a list of successes,” in <i>Proceedings 
+of the conference on functional programming languages and computer architecture</i>, 
+Nancy, France, 1985, pages 113–128.  Describes the “list of 
+successes” technique for implementing backtracking algorithms using 
+streams.</font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">Philip Wadler, 
+Walid Taha, and David MacQueen, “How to add laziness to a strict language 
+without even being odd.”  1998 ACM SIGPLAN Workshop on ML, pp. 24ff.  </font><font size="2" face="Courier New"><a href="http://homepages.inf.ed.ac.uk/wadler/papers/lazyinstrict/lazyinstrict.ps" target="_blank">homepages.inf.ed.ac.uk/wadler<WBR>/papers/lazyinstrict/lazyinstri<WBR>ct.ps</a></font><font size="2" face="Times New Roman">.  Describes odd and even styles 
+of lazy evaluation, and shows how to add lazy evaluation to the strict 
+functional language SML. </font></p>
+
+<p align="justify"><font size="2" face="Times New Roman">All cited web 
+pages visited during September 2007.</font></p>
+
+<H1>Copyright</H1>
+<font size="2" face="Times New Roman">Copyright (C) Philip L. Bewig (2007). All Rights Reserved. 
+<p>
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+<p>
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+<p>
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+<p align="justify"><font size="2" face="Times New Roman">A version of this
+document suitable for printing is available at</font><font size="2" face="Courier New">
+<a href="streams.pdf">streams.pdf</a></font><font size="2" face="Times New Roman">.</font></p>
+
+<hr>
+<address>Editor: <a href="mailto:srfi-editors at srfi dot schemers dot org">Michael Sperber</a></address>
+</font>
+</body>
+</html>
