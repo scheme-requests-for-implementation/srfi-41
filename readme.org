@@ -1,0 +1,16 @@
+* SRFI 41: Streams
+
+** by Philip L. Bewig
+
+This repository hosts [[http://srfi.schemers.org/srfi-41/][SRFI 41]]: Streams, a [[http://srfi.schemers.org/][Scheme Request for Implementation]].
+
+This SRFI is in /final/ status.
+
+The full documentation for this SRFI can be found in the [[http://srfi.schemers.org/srfi-41/srfi-41.html][SRFI Document]].
+
+If you'd like to participate in the discussion of this SRFI, or report issues with it, please [[http://srfi.schemers.org/srfi-41/][join the SRFI-41 mailing list]] and send your message there.
+
+Thank you.
+
+
+[[mailto:srfi-editors@srfi.schemers.org][The SRFI Editors]]
