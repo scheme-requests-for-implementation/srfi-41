@@ -1,6 +1,8 @@
 <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
 <html>
   <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="http://srfi.schemers.org/srfi.css" type="text/css" />
     <title>SRFI 41: Streams</title>
   </head>
 
@@ -112,7 +114,7 @@ of items as a whole, similar to a pipeline of unix commands.</font></p>
 
 <p align="justify"><font face="serif">In addition 
 to improved modularity, streams permit a clear exposition of backtracking 
-algorithms using the ìstream of successesî technique, and they can 
+algorithms using the ‚Äústream of successes‚Äù technique, and they can 
 be used to model generators and co-routines.  The implicit memoization 
 of streams makes them useful for building persistent data structures, 
 and the laziness of streams permits some multi-pass algorithms to be 
@@ -146,7 +148,7 @@ two data types.</font></p>
   :: (promise stream-null)
   |  (promise (&alpha; stream-pair))</pre><pre>
 &alpha; stream-pair
-  :: (promise &alpha;) ◊ (promise (&alpha; stream))</pre></font></p>
+  :: (promise &alpha;) √ó (promise (&alpha; stream))</pre></font></p>
 
 <p align="justify"><font face="serif">The object 
 stored in the </font><font face="monospace">stream-car</font><font face="serif"> of a </font><font face="monospace">stream-pair</font><font face="serif"> is a promise that is forced the first 
@@ -210,7 +212,7 @@ distinguish </font><font face="monospace">stream-null</font><font face="serif"> 
 <font face="monospace">Stream-car</font><font face="serif"> is a procedure that takes a <i>stream</i> 
 and returns the object stored in the </font><font face="monospace">stream-car</font><font face="serif"> of the <i>stream</i>.  </font><font face="monospace">Stream-car</font><font face="serif"> 
 signals an error if the object passed to it is not a </font><font face="monospace">stream-pair</font><font face="serif">.  Calling </font><font face="monospace">stream-car</font><font face="serif"> causes the object stored there to 
-be evaluated if it has not yet been; the objectís value is cached 
+be evaluated if it has not yet been; the object‚Äôs value is cached 
 in case it is needed again.</font></p>
 
 <p align="justify"><font face="serif"><b>accessor: </b></font><font face="monospace"><b>(stream-cdr </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
@@ -294,8 +296,8 @@ evens)) </font><font face="Symbol">&rArr;</font><font face="monospace">
 library provides useful procedures and syntax that depend on the primitives 
 defined above.  In the operator 
 templates given below, an ellipsis </font><font face="monospace">...</font><font face="serif"> indicates zero or more repetitions 
-of the preceding subexpression and square brackets </font><font face="monospace">[Ö]</font><font face="serif"> indicate optional elements.  
-In the type annotations given below, square brackets </font><font face="monospace">[Ö]</font><font face="serif"> refer to lists, curly braces </font><font face="monospace">{Ö}</font><font face="serif"> 
+of the preceding subexpression and square brackets </font><font face="monospace">[‚Ä¶]</font><font face="serif"> indicate optional elements.  
+In the type annotations given below, square brackets </font><font face="monospace">[‚Ä¶]</font><font face="serif"> refer to lists, curly braces </font><font face="monospace">{‚Ä¶}</font><font face="serif"> 
 refer to streams, and </font><font face="monospace">nat</font><font face="serif"> refers to exact non-negative integers.</font></p>
 
 <p align="justify"><font face="serif"><b>syntax: </b></font><font face="monospace"><b>(define-stream 
@@ -495,7 +497,7 @@ repeating the <i>object</i>s in succession forever.</font></p>
 #t #f #t #f #t #f ...</font></p>
 
 <p align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-drop </b></font><font face="serif"><b><i>n</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><font face="serif"><b> procedure </b></font><br>
-<font face="monospace">nat ◊ {&alpha;} &rarr; {&alpha;}</font><br>
+<font face="monospace">nat √ó {&alpha;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-drop</font><font face="serif"> returns the suffix of the input <i>
 stream</i> that starts at the next element after the first <i>n</i> 
 elements.  The output stream shares structure with the input <i>
@@ -755,16 +757,16 @@ matches.  There are four types of <i>pattern</i>s:</font></p>
 
 <ul type="DISC">
   <li><font face="monospace">()</font><font face="serif"> 
-  ó Matches the null stream.</font></li>
+  ‚Äî Matches the null stream.</font></li>
   <li><font face="monospace">(</font><font face="serif"><i>pat</i><sub><i>0</i></sub></font><font face="monospace"> </font><font face="serif"><i>pat</i><sub><i>1</i></sub></font><font face="monospace"> ...)</font><font face="serif"> 
-  ó Matches a finite stream with length exactly equal to the number 
+  ‚Äî Matches a finite stream with length exactly equal to the number 
   of pattern elements.</font></li>
   <li><font face="monospace">(</font><font face="serif"><i>pat</i><sub><i>0</i></sub></font><font face="monospace"> </font><font face="serif"><i>pat</i><sub><i>1</i></sub></font><font face="monospace"> ... . </font><font face="serif"><i>pat</i><sub><i>rest</i></sub></font><font face="monospace">)</font><font face="serif"> 
-  ó Matches an infinite stream, or a finite stream with length at least 
+  ‚Äî Matches an infinite stream, or a finite stream with length at least 
   as great as the number of pattern elements before the literal dot.</font></li>
-  <li><font face="serif"><i>pat</i> ó Matches 
+  <li><font face="serif"><i>pat</i> ‚Äî Matches 
   an entire stream.  Should always appear last in the list of clauses; 
-  itís not an error to appear elsewhere, but subsequent clauses could 
+  it‚Äôs not an error to appear elsewhere, but subsequent clauses could 
   never match.</font></li>
 </ul>
 
@@ -772,13 +774,13 @@ matches.  There are four types of <i>pattern</i>s:</font></p>
 element <i>pat</i><sub><i>i</i></sub> may be either:</font></p>
 
 <ul type="DISC">
-  <li><font face="serif">An identifier ó 
+  <li><font face="serif">An identifier ‚Äî 
   Matches any stream element.  Additionally, the value of the stream 
   element is bound to the variable named by the identifier, which is in 
   scope in the <i>fender</i> and <i>expr</i>ession of the corresponding <i>clause</i>.  
   Each identifier in a single pattern must be unique.</font></li>
   <li><font face="serif">A literal underscore 
-  ó Matches any stream element, but creates no bindings.</font></li>
+  ‚Äî Matches any stream element, but creates no bindings.</font></li>
 </ul>
 
 <p align="justify"><font face="serif">The <i>pattern</i>s 
@@ -836,14 +838,14 @@ are four types of clauses:</font></p>
 
 <ul type="DISC">
   <li><font face="monospace">(</font><font face="serif"><i>var</i></font><font face="monospace"> in </font><font face="serif"><i>stream-expr</i></font><font face="monospace">)</font><font face="serif"> 
-  ó Loop over the elements of <i>stream-expr</i>, in order from the 
+  ‚Äî Loop over the elements of <i>stream-expr</i>, in order from the 
   start of the stream, binding each element of the stream in turn to <i>
   var</i>.  </font><font face="monospace">Stream-from</font><font face="serif"> and </font><font face="monospace">stream-range</font><font face="serif"> are frequently useful as generators 
   for <i>stream-expr</i>.</font></li>
   <li><font face="monospace">(</font><font face="serif"><i>var</i></font><font face="monospace"> is </font><font face="serif"><i>expr</i></font><font face="monospace">)</font><font face="serif"> 
-  ó Bind <i>var</i> to the value obtained by evaluating <i>expr</i>.</font></li>
+  ‚Äî Bind <i>var</i> to the value obtained by evaluating <i>expr</i>.</font></li>
   <li><font face="monospace">(pred? </font><font face="serif"><i>expr</i></font><font face="monospace">)</font><font face="serif"> 
-  ó Include in the output stream only those elements <i>x</i> for which </font><font face="monospace">(pred? </font><font face="serif"><i>x</i></font><font face="monospace">)</font><font face="serif"> 
+  ‚Äî Include in the output stream only those elements <i>x</i> for which </font><font face="monospace">(pred? </font><font face="serif"><i>x</i></font><font face="monospace">)</font><font face="serif"> 
   is non-</font><font face="monospace">#f</font><font face="serif">.</font></li>
 </ul>
 
@@ -958,7 +960,7 @@ for each of the first <i>i</i> elements of <i>stream</i>.</font></p>
 
 <p align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-take </b></font><font face="serif"><b><i>n</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
-<font face="monospace">nat ◊ {&alpha;} &rarr; {&alpha;}</font><br>
+<font face="monospace">nat √ó {&alpha;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-take</font><font face="serif"> takes a non-negative integer <i>n</i> 
 and a <i>stream</i> and returns a newly-allocated stream containing 
 the first <i>n</i> elements of the input <i>stream</i>.  If the 
@@ -997,7 +999,7 @@ See also </font><font face="monospace">stream-drop-while</font><font face="serif
 
 <p align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-unfold </b></font><font face="serif"><b><i>map</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>pred?</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>gen</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>base</i>)</b></font><br>
-<font face="monospace">(&alpha; &rarr; &beta;) &times; (&alpha; &rarr; boolean) &times; (&alpha; &rarr; &alpha;) ◊ &alpha; &rarr; {&beta;}</font><br>
+<font face="monospace">(&alpha; &rarr; &beta;) &times; (&alpha; &rarr; boolean) &times; (&alpha; &rarr; &alpha;) √ó &alpha; &rarr; {&beta;}</font><br>
 <font face="monospace">Stream-unfold</font><font face="serif"> is the fundamental recursive stream 
 constructor.  It constructs a stream by repeatedly applying <i>
 gen</i> to successive values of <i>base</i>, in the manner of </font><font face="monospace">stream-iterate</font><font face="serif">, 
@@ -1040,12 +1042,12 @@ element of the <i>i</i><sup><i>th</i></sup> result stream:</font></p>
 
 <ul type="DISC">
   <li><font face="monospace">(</font><font face="serif"><i>value</i></font><font face="monospace">)</font><font face="serif"> 
-  ó <i>value</i> is the next car of the result stream</font></li>
+  ‚Äî <i>value</i> is the next car of the result stream</font></li>
   <li><font face="monospace">#f</font><font face="serif"> 
-  ó no value produced by this iteration of the generator <i>proc</i> 
+  ‚Äî no value produced by this iteration of the generator <i>proc</i> 
   for the result stream</font></li>
   <li><font face="monospace">()</font><font face="serif"> 
-  ó the end of the result stream</font></li>
+  ‚Äî the end of the result stream</font></li>
 </ul>
 
 <p align="justify"><font face="serif">It may require 
@@ -1403,7 +1405,7 @@ at column <i>i</i> row <i>j</i> and column <i>m</i> row <i>n</i> check
 each other if their columns <i>i</i> and <i>m</i> are the same, or if 
 their rows <i>j</i> and <i>n</i> are the same, or if they are on the 
 same diagonal with <i>i</i> + <i>j</i> = <i>m</i> + <i>n</i> or <i>i</i> 
-ñ <i>j</i> = <i>m</i> ñ <i>n</i>.  There is no need to test 
+‚Äì <i>j</i> = <i>m</i> ‚Äì <i>n</i>.  There is no need to test 
 the columns, because the placement algorithm enforces that they differ, 
 so the </font><font face="monospace">check?</font><font face="serif"> 
 procedure tests if two queens hold each other in check.</font></p>
@@ -1945,7 +1947,7 @@ can be written using </font><font face="monospace">stream-let</font><font face="
 <p align="justify"><font face="serif">Here, </font><font face="monospace">stream-let</font><font face="serif"> 
 assures that each element of the result stream is properly delayed, 
 because each is subject to the </font><font face="monospace">stream-lambda</font><font face="serif"> that is implicit in </font><font face="monospace">stream-let</font><font face="serif">, so the result is truly a stream, 
-not a ìlist in disguise.î  Another version of this procedure 
+not a ‚Äúlist in disguise.‚Äù  Another version of this procedure 
 was given previously at the description of </font><font face="monospace">define-stream</font><font face="serif">.</font></p>
 
 <p align="justify"><font face="serif">Another common 
@@ -1970,7 +1972,7 @@ pattern requires the value of the next stream element after the one
 being considered.  Thus, to compute the <i>n</i><sup>th</sup> element 
 of the stream, one must know the <i>n</i>+1<sup>st</sup> element, and 
 to compute the <i>n</i>+1<sup>st</sup> element, one must know the <i>
-n</i>+2<sup>nd</sup> element, and to computeÖ.  The correct version, 
+n</i>+2<sup>nd</sup> element, and to compute‚Ä¶.  The correct version, 
 given above in the description of </font><font face="monospace">stream-drop-while</font><font face="serif">, only needs the current stream element.</font></p>
 
 <p align="justify"><font face="serif">A similar problem 
@@ -2113,7 +2115,7 @@ describe streams as either null or a pair with a stream in the tail:</font></p>
 <p align="justify"><font face="serif">That works 
 in a purely functional language such as Miranda
 or Haskell because the entire language is lazy.  In 
-an eager language like ML or Scheme, of course, itís just a normal, 
+an eager language like ML or Scheme, of course, it‚Äôs just a normal, 
 eager list.</font></p>
 
 <p align="justify"><font face="serif">Using ML, Wadler, 
@@ -2127,7 +2129,7 @@ withtype &#39;a stream
   = &#39;a stream_ susp;</pre></font></p>
 
 <p align="justify"><font face="serif">Their </font><font face="monospace">susp</font><font face="serif"> 
-type is similar to Schemeís </font><font face="monospace">promise</font><font face="serif"> type.  Since Scheme conflates 
+type is similar to Scheme‚Äôs </font><font face="monospace">promise</font><font face="serif"> type.  Since Scheme conflates 
 the notions of record and type (the only way to create a new type disjoint 
 from all other types is to create a record), it is necessary to distribute 
 the suspension through the two constructors of the stream data type:</font></p>
@@ -2139,11 +2141,11 @@ the suspension through the two constructors of the stream data type:</font></p>
 
 <p><font face="monospace"><pre>
 &alpha; stream-pair
-  :: &alpha; ◊ (&alpha; stream)</pre></font></p>
+  :: &alpha; √ó (&alpha; stream)</pre></font></p>
 
 <p align="justify"><font face="serif">That type captures 
 the systematic suspension of recursive promises that is the essence 
-of ìstreamness.î  But it doesnít quite work, because Scheme 
+of ‚Äústreamness.‚Äù  But it doesn‚Äôt quite work, because Scheme 
 is eager rather than lazy, and both the car and the cdr of the stream 
 are evaluated too early.  So the final type of streams delays both 
 the car and the cdr of the stream-pair:</font></p>
@@ -2155,7 +2157,7 @@ the car and the cdr of the stream-pair:</font></p>
 
 <p><font face="monospace"><pre>
 &alpha; stream-pair
-  :: (promise &alpha;) ◊ (promise (&alpha; stream))</pre></font></p>
+  :: (promise &alpha;) √ó (promise (&alpha; stream))</pre></font></p>
 
 <p align="justify"><font face="serif">The two outer 
 promises, in the </font><font face="monospace">stream</font><font face="serif"> type, provide streams without memoization.  
@@ -2168,7 +2170,7 @@ can be derived from those primitives.</font></p>
 
 <p align="justify"><font face="serif">It would seem 
 that the same set of primitives could apply to streams, but in fact 
-one additional primitive is required.  AndrÈ van Tonder describes 
+one additional primitive is required.  Andr√© van Tonder describes 
 the reason in his discussion of the promise data type.  The promises 
 of R6RS are inadequate to support iterative algorithms because each 
 time a promise is called iteratively it binds the old promise in the 
@@ -2182,7 +2184,7 @@ way, no space is wasted by the old promise.</font></p>
 describes this new promise type, and provides a recipe for its use: 
 all constructors are wrapped with </font><font face="monospace">delay</font><font face="serif">, all accessors are wrapped with </font><font face="monospace">force</font><font face="serif">, 
 and all function bodies are wrapped with </font><font face="monospace">lazy</font><font face="serif">.  Given the seven primitives 
-above, the first two parts of van Tonderís recipe are simple: the 
+above, the first two parts of van Tonder‚Äôs recipe are simple: the 
 two constructors </font><font face="monospace">stream-null</font><font face="serif"> and </font><font face="monospace">stream-pair</font><font face="serif"> hide </font><font face="monospace">delay</font><font face="serif">, and the two accessors </font><font face="monospace">stream-car</font><font face="serif"> 
 and </font><font face="monospace">stream-cdr</font><font face="serif"> 
 hide </font><font face="monospace">force</font><font face="serif"> 
@@ -2192,7 +2194,7 @@ of the stream type).</font></p>
 
 <p align="justify"><font face="serif">Although the 
 new promise type prevents a space leak, it creates a new problem: there 
-is no place to hide the </font><font face="monospace">lazy</font><font face="serif"> that is the third part of van Tonderís 
+is no place to hide the </font><font face="monospace">lazy</font><font face="serif"> that is the third part of van Tonder‚Äôs 
 recipe.  SRFI-40 solved this problem by exposing it (actually, 
 it exposed </font><font face="monospace">delay</font><font face="serif">, which was incorrect).  But that 
 violates good software engineering by preventing the stream 
@@ -2210,8 +2212,8 @@ hardest tasks when writing any program library is to decide what to
 include and, more importantly, what to exclude.  One important 
 guideline is minimalism, since once an operator enters a library it 
 must remain forever: <i>Il semble que la perfection soit atteinte non 
-quand il níy a plus rien ‡ ajouter, mais quand il níy a plus rien 
-‡ retrancher</i>.</font></p>
+quand il n‚Äôy a plus rien √† ajouter, mais quand il n‚Äôy a plus rien 
+√† retrancher</i>.</font></p>
 
 <p align="justify"><font face="serif">Since streams 
 are substantially slower than lists (the stream primitives require numerous 
@@ -2222,7 +2224,7 @@ or when there is some clear advantage of laziness (such as reducing
 the number of passes though a large data set).  Thus, the library 
 is biased toward functions that work with infinite streams left-to-right.  
 In particular, there is no right-fold; if you need to materialize an entire stream, 
-itís best to use a list.</font></p>
+it‚Äôs best to use a list.</font></p>
 
 <H2>Implementation of <font face="monospace">(streams primitive)</font></H2>
 
@@ -2740,7 +2742,7 @@ Second edition, 1996.  </font><font face="monospace"><a href="http://mitpress.mi
 science.  Section 3.5 includes extensive discussion of odd streams.</font></p>
 
 <p align="justify"><font face="serif">Anne L. Bewig.  
-ìGolden Ratioî (personal communication).  Homework for the 
+‚ÄúGolden Ratio‚Äù (personal communication).  Homework for the 
 high school course <i>Calculus</i>.  Teaching my daughter how to 
 calculate the 200<sup>th</sup> element of a continued fraction was a 
 moment of sheer joy in the development of the stream libraries.</font></p>
@@ -2763,40 +2765,40 @@ the best, though the terminology is dated.  Discusses even streams
 in Section 3.10.</font></p>
 
 <p align="justify"><font face="serif">Jeremy Gibbons, 
-David Lester and Richard Bird, ìFunctional Pearl: Enumerating the 
-Rationals,î under consideration for publication in <i>Journal of Functional 
+David Lester and Richard Bird, ‚ÄúFunctional Pearl: Enumerating the 
+Rationals,‚Äù under consideration for publication in <i>Journal of Functional 
 Programming</i>.  </font><font face="monospace"><a href="http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/rationals.pdf" target="_blank">http://web.comlab.ox.ac.uk<WBR>/oucl/work/jeremy.gibbons<WBR>/publications/rationals.pdf</a></font><font face="serif">.  Discusses a series of expressions 
 that enumerate the rational numbers without duplicates.</font></p>
 
 <p align="justify"><font face="serif">Carl Hewitt. 
-ìViewing control structures as patterns of passing messages,î in <i>
+‚ÄúViewing control structures as patterns of passing messages,‚Äù in <i>
 Journal of Artificial Intelligence</i>, Volume 8, Number 3 (June, 1977), 
 pp 323-364.  Also published as Artificial Intelligence Memo 410 
 by the Massachusetts Institute of Technology, </font><font face="monospace"><a href="ftp://publications.ai.mit.edu/ai-publications/pdf/AIM-410.pdf" target="_blank">ftp://publications.ai.mit.edu<WBR>/ai-publications/pdf/AIM-410<WBR>.pdf</a></font><font face="serif">.  Describes the Actor message-passing 
 system; one of the examples used is the </font><font face="monospace">same-fringe?</font><font face="serif"> problem.</font></p>
 
 <p align="justify"><font face="serif">Peter J. Landin.  
-ìA correspondence between ALGOL 60 and Churchís lambda-notation: 
-Part I,î  <i>Communications of the ACM</i>, Volume 8, Number 
-2, February 1965., pages 89ñ101.  The seminal description of 
+‚ÄúA correspondence between ALGOL 60 and Church‚Äôs lambda-notation: 
+Part I,‚Äù  <i>Communications of the ACM</i>, Volume 8, Number 
+2, February 1965., pages 89‚Äì101.  The seminal description of 
 streams.</font></p>
 
 <p align="justify"><font face="serif">Joe Marshall.  
-ìStream problem reduxî, from <i>Usenet 
+‚ÄúStream problem redux‚Äù, from <i>Usenet 
 comp.lang.scheme</i>, June 28, 2002.  </font><font face="monospace"><a href="http://groups.google.com/group/comp.lang.scheme/msg/db4b4a1f33e3eea8" target="_blank">groups.google.com/group/comp<WBR>.lang.scheme/msg/db4b4a1f33e3ee<WBR>a8</a></font><font face="serif">.  The original post on </font><font face="monospace">comp.lang.scheme</font><font face="serif"> 
 that describes the </font><font face="monospace">times3</font><font face="serif"> problem.</font></p>
 
 <p align="justify"><font face="serif">Chris Okasaki.  <i>
 Purely Functional Data Structures</i>.  Cambridge University Press, 
-2003.  Revised version of Okasakiís thesis <i>Purely Functional 
+2003.  Revised version of Okasaki‚Äôs thesis <i>Purely Functional 
 Data Structures</i>, Carnegie-Mellon University, 1996, </font><font face="monospace"><a href="http://www.cs.cmu.edu/~rwh/theses/okasaki.pdf" target="_blank">www.cs.cmu.edu/~rwh/theses<WBR>/okasaki.pdf</a></font><font face="serif">.  Provides a strong defense of 
 laziness, and describes several data structures that exploit laziness, 
 including streams and queues.</font></p>
 
 <p align="justify"><font face="serif">Stephen K. 
-Park and Keith W. Miller.  ìRandom number generators: good ones 
-are hard to find,î <i>Communications of the ACM</i>, Volume 31, Issue 
-10 (October 1988), pages 1192ñ1201.  Describes a minimal standard 
+Park and Keith W. Miller.  ‚ÄúRandom number generators: good ones 
+are hard to find,‚Äù <i>Communications of the ACM</i>, Volume 31, Issue 
+10 (October 1988), pages 1192‚Äì1201.  Describes a minimal standard 
 random number generator. </font></p>
 
 <p align="justify"><font face="serif">Simon Peyton-Jones, 
@@ -2810,7 +2812,7 @@ Elements of Functional Programming</i>.  Addison-Wesley, April
 1989.  A textbook on functional programming.</font></p>
 
 <p align="justify"><font face="serif">Antoine de 
-Saint-ExupÈry. Chapter III &ldquo;LíAvion&rdquo; of <i>Terre des Hommes</i>.  
+Saint-Exup√©ry. Chapter III &ldquo;L‚ÄôAvion&rdquo; of <i>Terre des Hommes</i>.  
 1939.  &ldquo;Perfection is achieved, not when there is nothing more 
 to add, but when there is nothing left to take away.&rdquo;</font></p>
 
@@ -2825,7 +2827,7 @@ Revised</i><sup><i>6</i></sup><i> Report on the Algorithmic Language
 Scheme</i>.  September 26, 2007. </font><font face="monospace"><a href="http://www.r6rs.org" target="_blank">www.r6rs.org</a></font><font face="serif">.  The standard definition of 
 the Scheme programming language.</font></p>
 
-<p align="justify"><font face="serif">AndrÈ van 
+<p align="justify"><font face="serif">Andr√© van 
 Tonder.  <i>Scheme Request for Implementation 45: 
 Primitives for Expressing Iterative Lazy Algorithms</i>.  </font><font face="monospace"><a href="http://srfi.schemers.org/srfi-45" target="_blank">srfi.schemers.org/srfi-45</a></font><font face="serif">.  
 April, 2004.  Describes the problems inherent in the </font><font face="monospace">promise</font><font face="serif"> 
@@ -2833,15 +2835,15 @@ data type of R5RS (also present in R6RS), and provides the alternate </font><fon
 data type used in the stream primitives.</font></p>
 
 <p align="justify"><font face="serif">Philip Wadler.  
-ìHow to replace failure by a list of successes,î in <i>Proceedings 
+‚ÄúHow to replace failure by a list of successes,‚Äù in <i>Proceedings 
 of the conference on functional programming languages and computer architecture</i>, 
-Nancy, France, 1985, pages 113ñ128.  Describes the ìlist of 
-successesî technique for implementing backtracking algorithms using 
+Nancy, France, 1985, pages 113‚Äì128.  Describes the ‚Äúlist of 
+successes‚Äù technique for implementing backtracking algorithms using 
 streams.</font></p>
 
 <p align="justify"><font face="serif">Philip Wadler, 
-Walid Taha, and David MacQueen, ìHow to add laziness to a strict language 
-without even being odd.î  1998 ACM SIGPLAN Workshop on ML, pp. 24ff.  </font><font face="monospace"><a href="http://homepages.inf.ed.ac.uk/wadler/papers/lazyinstrict/lazyinstrict.ps" target="_blank">homepages.inf.ed.ac.uk/wadler<WBR>/papers/lazyinstrict/lazyinstri<WBR>ct.ps</a></font><font face="serif">.  Describes odd and even styles 
+Walid Taha, and David MacQueen, ‚ÄúHow to add laziness to a strict language 
+without even being odd.‚Äù  1998 ACM SIGPLAN Workshop on ML, pp. 24ff.  </font><font face="monospace"><a href="http://homepages.inf.ed.ac.uk/wadler/papers/lazyinstrict/lazyinstrict.ps" target="_blank">homepages.inf.ed.ac.uk/wadler<WBR>/papers/lazyinstrict/lazyinstri<WBR>ct.ps</a></font><font face="serif">.  Describes odd and even styles 
 of lazy evaluation, and shows how to add lazy evaluation to the strict 
 functional language SML. </font></p>
 
