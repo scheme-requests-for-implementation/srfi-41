@@ -6,7 +6,7 @@ This repository hosts [[https://srfi.schemers.org/srfi-41/][SRFI 41]]: Streams, 
 
 This SRFI is in /final/ status.
 
-It is intended to replace [[https://srfi.schemers.org/srfi-40/][SRFI 40]].
+See also [[https://srfi.schemers.org/srfi-40/][SRFI 40: A Library of Streams]].
 
 The full documentation for this SRFI can be found in the [[https://srfi.schemers.org/srfi-41/srfi-41.html][SRFI Document]].
 
