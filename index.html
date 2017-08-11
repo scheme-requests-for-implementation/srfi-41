@@ -2,11 +2,20 @@
 <html>
   <head>
     <title>Streams</title>
-    <link href="/admin.css" rel="stylesheet">
-    <link href="/list.css" rel="stylesheet">
-    <link href="/favicon.png" rel="icon" sizes="192x192" type="image/png">
+    <link href="../srfi-common/admin.css" rel="stylesheet">
+    <link href="../srfi-common/list.css" rel="stylesheet">
+    <link href="../srfi-common/favicon.png" rel="icon" sizes="192x192" type="image/png">
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script type="text/x-mathjax-config">
+     MathJax.Hub.Config({
+       tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+     });
+    </script>
+    <script crossorigin="anonymous" integrity=
+            "sha384-Ra6zh6uYMmH5ydwCqqMoykyf1T/+ZcnOQfFPhDrp2kI4OIxadnhsvvA2vv9A7xYv" src=
+            "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+            type="text/javascript"></script>
   </head>
 
   <body>
@@ -62,4 +71,23 @@
                  value="unsubscribe" >
           <input name="list"
                  type="hidden"
-                 value="srfi-41@srfi.schemers.org" ></form></li></ul></body></html>
+                 value="srfi-41@srfi.schemers.org"></form></li></ul>
+    <h2>Abstract</h2>      <p><span class="c1">Streams, sometimes called
+      lazy lists, are a sequential data structure containing elements computed
+      only on demand. A stream is either null or is a pair with a stream in its
+      cdr. Since elements of a stream are computed only when accessed, streams
+      can be infinite. Once computed, the value of a stream element is cached
+      in case it is needed again.</span>
+      <p><span class="c1">Streams without memoization
+      were first described by Peter Landin in 1965. Memoization became accepted
+      as an essential feature of streams about a decade later. Today, streams
+      are the signature data type of functional programming languages such as
+      Haskell.</span>
+      <p><span class="c1">This Scheme Request for
+      Implementation describes two libraries for operating on streams: a
+      canonical set of stream primitives and a set of procedures and syntax
+      derived from those primitives that permits convenient expression of
+      stream operations. They rely on facilities provided by R6RS, including
+      libraries, records, and error reporting. To load both stream libraries,
+      say:</span>
+      <p><span class="c2">(import (streams))</span></body></html>
