@@ -65,9 +65,9 @@ and Gerald Jay Sussman discuss streams at length, giving a strong justification
 for their use.  The streams they provide are represented as a </font><font face="monospace">cons</font><font face="serif"> 
 pair with a promise to return a stream in its </font><font face="monospace">cdr</font><font face="serif">; for instance, a stream with elements 
 the first three counting numbers is represented conceptually as </font><font face="monospace">(cons 1 (delay (cons 2 (delay (cons 3 (delay 
-&#39;()))))))</font><font face="serif">.</font><font face="monospace">  </font><font face="serif">Philip Wadler, Walid Taha and David 
-MacQueen describe such streams as <i>odd</i> because, regardless of 
-their length, the parity of the number of constructors (</font><font face="monospace">delay</font><font face="serif">, </font><font face="monospace">cons</font><font face="serif">, </font><font face="monospace">&#39;()</font><font face="serif">) 
+'()))))))</font><font face="serif">.</font><font face="monospace">  </font><font face="serif">Philip Wadler, Walid Taha and David
+MacQueen describe such streams as <i>odd</i> because, regardless of
+their length, the parity of the number of constructors (</font><font face="monospace">delay</font><font face="serif">, </font><font face="monospace">cons</font><font face="serif">, </font><font face="monospace">'()</font><font face="serif">)
 in the stream is odd.</font></p>
 
 <p align="justify"><font face="serif">The streams 
@@ -152,12 +152,12 @@ provides eight operators: constructors for </font><font face="monospace">stream-
 the two kinds of streams, accessors for both fields of a </font><font face="monospace">stream-pair</font><font face="serif">, 
 and a lambda that creates procedures that return streams.</font></p>
 
-<p align="justify"><font face="serif"><b>constructor: </b></font><font face="monospace"><b>stream-null</b></font><br>
+<p id="stream-null" align="justify"><font face="serif"><b>constructor: </b></font><font face="monospace"><b>stream-null</b></font><br>
 <font face="monospace">Stream-null</font><font face="serif"> is a promise that, when forced, is 
 a single object, distinguishable from all other objects, that represents 
 the null stream.  </font><font face="monospace">Stream-null</font><font face="serif"> is immutable and unique.</font></p>
 
-<p align="justify"><font face="monospace"><font face="serif"><b>constructor: </b></font><b>(stream-cons </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="stream-cons" align="justify"><font face="monospace"><font face="serif"><b>constructor: </b></font><b>(stream-cons </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">Stream-cons</font><font face="serif"> is a macro that accepts an <i>object</i> 
 and a <i>stream</i> and creates a newly-allocated </font><font face="monospace">stream</font><font face="serif"> containing a promise that, when forced, 
 is a </font><font face="monospace">stream-pair</font><font face="serif"> with the <i>object</i> in its </font><font face="monospace">stream-car</font><font face="serif"> 
@@ -170,7 +170,7 @@ however, doing so will cause an error later when the </font><font face="monospac
 is immutable; there is no </font><font face="monospace">stream-set-car!</font><font face="serif"> or </font><font face="monospace">stream-set-cdr!</font><font face="serif"> that modifies an existing </font><font face="monospace">stream-pair</font><font face="serif">.  
 There is no dotted-pair or improper stream as with lists.</font></p>
 
-<p align="justify"><font face="serif"><b>recognizer: </b></font><font face="monospace"><b>(stream? </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="stream?" align="justify"><font face="serif"><b>recognizer: </b></font><font face="monospace"><b>(stream? </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">Stream?</font><font face="serif"> is a procedure that takes an <i>object</i> 
 and returns </font><font face="monospace">#t</font><font face="serif"> 
 if the <i>object</i> is a stream and </font><font face="monospace">#f</font><font face="serif"> otherwise.  If <i>object</i> 
@@ -183,35 +183,35 @@ obj)</font><font face="serif"> is </font><font face="monospace">#f</font><font f
 obj)</font><font face="serif"> and </font><font face="monospace">(stream-pair? 
 obj)</font><font face="serif"> will be </font><font face="monospace">#f</font><font face="serif">. </font></p>
 
-<p align="justify"><font face="serif"><b>recognizer: </b></font><font face="monospace"><b>(stream-null? </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="stream-null?" align="justify"><font face="serif"><b>recognizer: </b></font><font face="monospace"><b>(stream-null? </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">Stream-null?</font><font face="serif"> is a procedure that takes an <i>object</i> 
 and returns </font><font face="monospace">#t</font><font face="serif"> 
 if the <i>object</i> is the distinguished null stream and </font><font face="monospace">#f</font><font face="serif"> 
 otherwise.  If <i>object</i> is a stream, </font><font face="monospace">stream-null?</font><font face="serif"> must force its promise in order to 
 distinguish </font><font face="monospace">stream-null</font><font face="serif"> from </font><font face="monospace">stream-pair</font><font face="serif">.</font></p>
 
-<p align="justify"><font face="serif"><b>recognizer: </b></font><font face="monospace"><b>(stream-pair? </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="stream-pair?" align="justify"><font face="serif"><b>recognizer: </b></font><font face="monospace"><b>(stream-pair? </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">Stream-pair?</font><font face="serif"> is a procedure that takes an <i>object</i> 
 and returns </font><font face="monospace">#t</font><font face="serif"> 
 if the <i>object</i> is a </font><font face="monospace">stream-pair</font><font face="serif"> constructed by </font><font face="monospace">stream-cons</font><font face="serif"> and </font><font face="monospace">#f</font><font face="serif"> otherwise.  If <i>object</i> 
 is a stream, </font><font face="monospace">stream-pair?</font><font face="serif"> must force its promise in order to 
 distinguish </font><font face="monospace">stream-null</font><font face="serif"> from </font><font face="monospace">stream-pair</font><font face="serif">.</font></p>
 
-<p align="justify"><font face="serif"><b>accessor: </b></font><font face="monospace"><b>(stream-car </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="stream-car" align="justify"><font face="serif"><b>accessor: </b></font><font face="monospace"><b>(stream-car </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">Stream-car</font><font face="serif"> is a procedure that takes a <i>stream</i> 
 and returns the object stored in the </font><font face="monospace">stream-car</font><font face="serif"> of the <i>stream</i>.  </font><font face="monospace">Stream-car</font><font face="serif"> 
 signals an error if the object passed to it is not a </font><font face="monospace">stream-pair</font><font face="serif">.  Calling </font><font face="monospace">stream-car</font><font face="serif"> causes the object stored there to 
 be evaluated if it has not yet been; the object’s value is cached 
 in case it is needed again.</font></p>
 
-<p align="justify"><font face="serif"><b>accessor: </b></font><font face="monospace"><b>(stream-cdr </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="stream-cdr" align="justify"><font face="serif"><b>accessor: </b></font><font face="monospace"><b>(stream-cdr </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">Stream-cdr</font><font face="serif"> is a procedure that takes a <i>stream</i> 
 and returns the stream stored in the </font><font face="monospace">stream-cdr</font><font face="serif"> of the <i>stream</i>.  </font><font face="monospace">Stream-cdr</font><font face="serif"> 
 signals an error if the object passed to it is not a </font><font face="monospace">stream-pair</font><font face="serif">.  Calling </font><font face="monospace">stream-cdr</font><font face="serif"> 
 does not force the promise containing the stream stored in the
 </font><font face="monospace">stream-cdr</font><font face="serif"> of the <i>stream</i>.
 
-<p align="justify"><font face="serif"><b>lambda: </b></font><font face="serif"><b>(</b></font><font face="monospace"><b>stream-lambda </b></font><font face="serif"><b><i>args</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>body</i>)</b></font><br>
+<p id="stream-lambda" align="justify"><font face="serif"><b>lambda: </b></font><font face="serif"><b>(</b></font><font face="monospace"><b>stream-lambda </b></font><font face="serif"><b><i>args</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>body</i>)</b></font><br>
 <font face="monospace">Stream-lambda</font><font face="serif"> creates a procedure that returns a 
 promise to evaluate the <i>body</i> of the procedure.  The last <i>
 body</i> expression to be evaluated must yield a stream.  As with 
@@ -289,7 +289,7 @@ of the preceding subexpression and square brackets </font><font face="monospace"
 In the type annotations given below, square brackets </font><font face="monospace">[…]</font><font face="serif"> refer to lists, curly braces </font><font face="monospace">{…}</font><font face="serif"> 
 refer to streams, and </font><font face="monospace">nat</font><font face="serif"> refers to exact non-negative integers.</font></p>
 
-<p align="justify"><font face="serif"><b>syntax: </b></font><font face="monospace"><b>(define-stream 
+<p id="define-stream" align="justify"><font face="serif"><b>syntax: </b></font><font face="monospace"><b>(define-stream
 (</b></font><font face="serif"><b><i>name</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>args</i></b></font><font face="monospace"><b>) </b></font><font face="serif"><b><i>body</i></b></font><font face="monospace"><b>) </b></font><br>
 <font face="monospace">Define-stream</font><font face="serif"> creates a procedure that returns a 
 stream, and may appear anywhere a normal </font><font face="monospace">define</font><font face="serif"> may appear, including as an internal 
@@ -309,14 +309,14 @@ see also </font><font face="monospace">stream-let</font><font face="serif">, whi
         (proc (stream-car strm))
         (stream-map proc (stream-cdr strm))))))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(list-&gt;stream </b></font><font face="serif"><b><i>list-of-objects</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="list-to-stream" align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(list-&gt;stream </b></font><font face="serif"><b><i>list-of-objects</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">[&alpha;] &rarr; {&alpha;}</font><br>
 <font face="monospace">List-&gt;stream</font><font face="serif"> takes a list of objects and returns 
 a newly-allocated stream containing in its elements the objects in the 
 list.  Since the objects are given in a list, they are evaluated 
 when </font><font face="monospace">list-&gt;stream</font><font face="serif"> is called, before the stream is created.  
 If the list of objects is null, as in </font><font face="monospace">(list-&gt;stream 
-&#39;())</font><font face="serif">, the null stream is 
+'())</font><font face="serif">, the null stream is
 returned.  See also </font><font face="monospace">stream</font><font face="serif">.</font></p>
 
 <p align="justify"><font face="monospace">(define strm123 (list-&gt;stream &#39;(1 2 3)))</font></p>
@@ -325,7 +325,7 @@ returned.  See also </font><font face="monospace">stream</font><font face="serif
 <pre>; fails with divide-by-zero error
 (define s (list-&gt;stream (list 1 (/ 1 0) -1)))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(port-&gt;stream 
+<p id="port-to-stream" align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(port-&gt;stream
 [</b></font><font face="serif"><b><i>port</i></b></font><font face="monospace"><b>])</b></font><br>
 <font face="monospace">port &rarr; {char}</font><br>
 <font face="monospace">Port-&gt;stream</font><font face="serif"> takes a <i>port</i> and returns a 
@@ -356,7 +356,7 @@ into a stream, say:</font></p>
           (stream-cons c
             (loop (read-char p)))))))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>syntax: </b></font><font face="monospace"><b>(stream </b></font><font face="serif"><b><i>object</i> </b></font><font face="monospace"><b>...)</b></font><br>
+<p id="stream" align="justify"><font face="serif"><b>syntax: </b></font><font face="monospace"><b>(stream </b></font><font face="serif"><b><i>object</i> </b></font><font face="monospace"><b>...)</b></font><br>
 <font face="monospace">Stream</font><font face="serif"> is syntax that takes zero or more <i>
 object</i>s and creates a newly-allocated stream containing in its elements 
 the <i>object</i>s, in order.  Since </font><font face="monospace">stream</font><font face="serif"> is syntactic, the <i>object</i>s are 
@@ -370,7 +370,7 @@ See also </font><font face="monospace">list-&gt;stream</font><font face="serif">
 ; (/ 1 0) not evaluated when stream is created
 (define s (stream 1 (/ 1 0) -1))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-&gt;list 
+<p id="stream-to-list" align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-&gt;list
 [</b></font><font face="serif"><b><i>n</i></b></font><font face="monospace"><b>] </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">nat &times; {&alpha;} &rarr; [&alpha;]</font><br>
 <font face="monospace">Stream-&gt;list</font><font face="serif"> takes a natural number <i>n</i> and 
@@ -387,7 +387,7 @@ will never return.</font></p>
     (stream-from 0)))
   </font><font face="Symbol">&rArr;</font><font face="monospace"> (0 1 4 9 16 25 36 49 64 81)</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b>
+<p id="stream-append" align="justify"><font face="serif"><b>procedure: </b>
 </font><font face="monospace"><b>(stream-append </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b> ...)</b></font><br>
 <font face="monospace">{&alpha;} ... &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-append</font><font face="serif"> returns a newly-allocated stream containing 
@@ -431,7 +431,7 @@ element is appended to the end of the result stream.  This also
 implies that during traversal of the result only one promise needs to 
 be kept in memory at a time.</font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-concat </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="stream-concat" align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-concat </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">{{&alpha;}} ... &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-concat</font><font face="serif"> takes a <i>stream</i> consisting of 
 one or more streams and returns a newly-allocated stream containing 
@@ -473,7 +473,7 @@ x</i> inserted in each possible position of <i>yy</i>:</font></p>
             (interleave (stream-car xs) ys))
           (perms (stream-cdr xs))))))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-constant </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b> ...)</b></font><br>
+<p id="stream-constant" align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-constant </b></font><font face="serif"><b><i>object</i></b></font><font face="monospace"><b> ...)</b></font><br>
 <font face="monospace">&alpha; ... &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-constant</font><font face="serif"> takes one or more <i>object</i>s and 
 returns a newly-allocated stream containing in its elements the <i>object</i>s, 
@@ -485,7 +485,7 @@ repeating the <i>object</i>s in succession forever.</font></p>
 #t #f) </font><font face="Symbol">&rArr;</font><font face="monospace"> 
 #t #f #t #f #t #f ...</font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-drop </b></font><font face="serif"><b><i>n</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><font face="serif"><b> procedure </b></font><br>
+<p id="stream-drop" align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-drop </b></font><font face="serif"><b><i>n</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><font face="serif"><b> procedure </b></font><br>
 <font face="monospace">nat × {&alpha;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-drop</font><font face="serif"> returns the suffix of the input <i>
 stream</i> that starts at the next element after the first <i>n</i> 
@@ -500,7 +500,7 @@ also </font><font face="monospace">stream-take</font><font face="serif">.</font>
   (values (stream-take n strm)
           (stream-drop n strm)))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-drop-while </b></font><font face="serif"><b><i>pred?</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
+<p id="stream-drop-while" align="justify"><font face="serif"><b>procedure: </b></font><font face="monospace"><b>(stream-drop-while </b></font><font face="serif"><b><i>pred?</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">(&alpha; &rarr; boolean) &times; {&alpha;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-drop-while</font><font face="serif"> returns the suffix of the input <i>
 stream</i> that starts at the first element <i>x</i> for which </font><font face="monospace">(pred? </font><font face="serif"><i>x</i></font><font face="monospace">)</font><font face="serif"> 
@@ -522,7 +522,7 @@ only the first of any sub-sequences of repeated elements.</font></p>
               (eql? (stream-car strm) x))
             strm)))))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-filter" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-filter </b></font><font face="serif"><b><i>pred?</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">(&alpha; &rarr; boolean) &times; {&alpha;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-filter</font><font face="serif"> returns a newly-allocated stream that 
@@ -534,7 +534,7 @@ is non-</font><font face="monospace">#f</font><font face="serif">.</font></p>
 (stream-filter odd? (stream-from 0))
    &rArr; 1 3 5 7 9 ...</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-fold" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-fold </b></font><font face="serif"><b><i>proc</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>base</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">(&alpha; &times; &beta; &rarr; &alpha;) &times; &alpha; &times; {&beta;} &rarr; &alpha;</font><br>
 <font face="monospace">Stream-fold</font><font face="serif"> applies a binary <i>proc</i>edure 
@@ -590,7 +590,7 @@ it is useful to have </font><font face="monospace">stream-fold</font><font face=
               (stream-cons x strm)))))
     (stream-fold insert stream-null strm))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-for-each" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-for-each </b></font><font face="serif"><b><i>proc</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b> ...)</b></font><br>
 <font face="monospace">(&alpha; &times; &beta; &times; ...) &times; {&alpha;} &times; {&beta;} ...</font><br>
 <font face="monospace">Stream-for-each</font><font face="serif"> applies a <i>proc</i>edure element-wise 
@@ -604,7 +604,7 @@ procedure displays the contents of a file:</font></p>
   (stream-for-each display
     (file-&gt;stream filename)))</pre></font></p>
 
-<p align="justify"><font face="monospace">
+<p id="stream-from" align="justify"><font face="monospace">
 <font face="serif"><b>procedure: </b></font>
 <b>(stream-from </b></font><font face="serif"><b><i>first</i></b></font><font face="monospace"><b> 
 [</b></font><font face="serif"><b><i>step</i></b></font><font face="monospace"><b>])</b></font><br>
@@ -624,7 +624,7 @@ for a similar procedure that creates finite streams.</font><font face="monospace
 1 2)) </font><font face="Symbol">&rArr;</font><font face="monospace"> 
 1 3 5 ...</font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-iterate" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-iterate proc base)</b></font><br>
 <font face="monospace">(&alpha; &rarr; &alpha;) &times; &alpha; &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-iterate</font><font face="serif"> creates a newly-allocated stream containing <i>
@@ -662,7 +662,7 @@ can be calculated by the stream</font></p>
 <p align="justify"><font face="monospace">(stream-iterate 
 (lambda (x) (+ 1 (/ x))) 1)</font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-length" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-length </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">{&alpha;} &rarr; nat</font><br>
 <font face="monospace">Stream-length</font><font face="serif"> takes an input <i>stream</i> and returns 
@@ -674,7 +674,7 @@ it enters an infinite loop with infinite streams.</font></p>
 strm123) </font><font face="Symbol">&rArr;</font><font face="monospace"> 
 3</font></p>
 
-<p align="justify"><font face="serif"><b>syntax: </b></font>
+<p id="stream-let" align="justify"><font face="serif"><b>syntax: </b></font>
 <font face="monospace"><b>(stream-let </b></font><font face="serif"><b><i>tag</i></b></font><font face="monospace"><b> 
 ((</b></font><font face="serif"><b><i>var</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>expr</i></b></font><font face="monospace"><b>) ...) </b></font><font face="serif"><b><i>body</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">Stream-let</font><font face="serif"> creates a local scope that binds each <i>
@@ -705,7 +705,7 @@ or the null stream if <i>x</i> is not present in </font><font face="monospace">s
           ((eql? obj (stream-car strm)) strm)
           (else (loop (stream-cdr strm))))))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-map" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-map </b></font><font face="serif"><b><i>proc stream</i> </b></font><font face="monospace"><b>...)</b></font><br>
 <font face="monospace">(&alpha; &times; &beta; ... &rarr; &omega;) &times; {&alpha;} &times; {&beta;} ... &rarr; {&omega;}</font><br>
 <font face="monospace">Stream-map</font><font face="serif"> applies a <i>proc</i>edure element-wise 
@@ -733,7 +733,7 @@ languages, </font><font face="monospace">stream-map</font><font face="serif"> ta
 and </font><font face="monospace">stream-zipwith</font><font face="serif"> provides a companion function that 
 takes multiple input streams.</font></p>
 
-<p align="justify"><font face="serif"><b>syntax: </b></font>
+<p id="stream-match" align="justify"><font face="serif"><b>syntax: </b></font>
 <font face="monospace"><b>(stream-match </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>clause</i></b></font><font face="monospace"><b> ...)</b></font><br>
 <font face="monospace">Stream-match</font><font face="serif"> provides the syntax of pattern-matching 
 for streams.  The input <i>stream</i> is an expression that evaluates 
@@ -818,7 +818,7 @@ stably merges two or more streams ordered by the </font><font face="monospace">l
                        (apply stream-merge lt?
                          (cdr strms)))))))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>syntax: </b></font>
+<p id="stream-of" align="justify"><font face="serif"><b>syntax: </b></font>
 <font face="monospace"><b>(stream-of </b></font><font face="serif"><b><i>expr</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>clause</i></b></font><font face="monospace"><b> ...)</b></font><br>
 <font face="monospace">Stream-of</font><font face="serif"> provides the syntax of stream comprehensions, 
 which generate streams by means of looping expressions.  The result 
@@ -871,7 +871,7 @@ containing only the element </font><font face="monospace">1</font><font face="se
   (j in (stream-range (+ i 1) 5)))
   &rArr; (1 2) (1 3) (1 4) (2 3) (2 4) (3 4)</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-range" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-range </b></font><font face="serif"><b><i>first</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>past</i></b></font><font face="monospace"><b> 
 [</b></font><font face="serif"><b><i>step</i></b></font><font face="monospace"><b>])</b></font><br>
 <font face="monospace">number &times; number &times; number &rarr; {number}</font><br>
@@ -899,7 +899,7 @@ so if any of <i>first</i>, <i>past</i> or <i>step</i> are inexact, the
 length of the output stream may differ from </font><font face="monospace">(ceiling 
 (- (/ (- </font><font face="serif"><i>past</i></font><font face="monospace"> </font><font face="serif"><i>first</i></font><font face="monospace">) </font><font face="serif"><i>step</i></font><font face="monospace">) 1)</font><font face="serif">.</font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-ref" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-ref </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>n</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">{&alpha;} &times; nat &rarr; &alpha;</font><br>
 <font face="monospace">Stream-ref</font><font face="serif"> returns the <i>n</i>th element of <i>
@@ -912,7 +912,7 @@ is greater than or equal to the length of <i>stream</i>.</font><font face="monos
     (stream-scan * 1 (stream-from 1))
     n))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-reverse" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-reverse </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">{&alpha;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-reverse</font><font face="serif"> returns a newly-allocated stream containing 
@@ -930,7 +930,7 @@ of the stream.</font></p>
 &gt; (stream-ref r 1)
 error: division by zero</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-scan" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-scan </b></font><font face="serif"><b><i>proc</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>base</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">(&alpha; &times; &beta; &rarr; &alpha;) &times; &alpha; &times; {&beta;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-scan</font><font face="serif"> accumulates the partial folds of an 
@@ -947,7 +947,7 @@ for each of the first <i>i</i> elements of <i>stream</i>.</font></p>
 (stream-scan * 1 (stream-from 1))
   &rArr; (stream 1 1 2 6 24 120 ...)</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-take" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-take </b></font><font face="serif"><b><i>n</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">nat × {&alpha;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-take</font><font face="serif"> takes a non-negative integer <i>n</i> 
@@ -970,7 +970,7 @@ the results:</font></p>
         (stream-merge lt?
           (msort &lt; ts) (msort &lt; ds)))))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-take-while" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-take-while </b></font><font face="serif"><b><i>pred?</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b>)</b></font><br>
 <font face="monospace">(&alpha; &rarr; boolean) &times; {&alpha;} &rarr; {&alpha;}</font><br>
 <font face="monospace">Stream-take-while</font><font face="serif"> takes a predicate and a <i>stream</i> 
@@ -986,7 +986,7 @@ See also </font><font face="monospace">stream-drop-while</font><font face="serif
       (lambda (x) (&lt; x 1000))
         primes))) &rArr; 997</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-unfold" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-unfold </b></font><font face="serif"><b><i>map</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>pred?</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>gen</i></b></font><font face="monospace"><b> </b></font><font face="serif"><b><i>base</i>)</b></font><br>
 <font face="monospace">(&alpha; &rarr; &beta;) &times; (&alpha; &rarr; boolean) &times; (&alpha; &rarr; &alpha;) × &alpha; &rarr; {&beta;}</font><br>
 <font face="monospace">Stream-unfold</font><font face="serif"> is the fundamental recursive stream 
@@ -1079,7 +1079,7 @@ pred?</i> once for each element of <i>strm</i>.</font></p>
           (stream-&gt;list evens))))
   &rArr; ((1 3 5) (2 4))</pre></font></p>
 
-<p align="justify"><font face="serif"><b>procedure: </b></font>
+<p id="stream-zip" align="justify"><font face="serif"><b>procedure: </b></font>
 <font face="monospace"><b>(stream-zip </b></font><font face="serif"><b><i>stream</i></b></font><font face="monospace"><b> ...)</b></font><br>
 <font face="monospace">{&alpha;} &times; {&beta;} &times; ... &rarr; {[&alpha; &beta; ...]}</font><br>
 <font face="monospace">Stream-zip</font><font face="serif"> takes one or more input <i>stream</i>s 
