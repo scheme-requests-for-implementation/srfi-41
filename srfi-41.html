@@ -1,25 +1,20 @@
 <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="https://srfi.schemers.org/srfi.css" type="text/css" />
     <title>SRFI 41: Streams</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/srfi.css" type="text/css" />
+    <link rel="stylesheet" href="https://srfi.schemers.org/srfi.css" type="text/css" />
+    <link href="/favicon.png" rel="icon" sizes="192x192" type="image/png" />
   </head>
 
   <body>
 
-<H1>Title</H1>
+<h1><a href="https://srfi.schemers.org/"><img class="srfi-logo" src="https://srfi.schemers.org/srfi-logo.svg" alt="SRFI surfboard logo" /></a>41: Streams</h1>
 
-Streams
+<p>by Philip L. Bewig</p>
 
-
-<H1>Author</H1>
-
-Philip L. Bewig
-
-<H1>Status</H1>
+<h2>Status</h2>
 
 <p>This SRFI is currently in <em>final</em> status.  Here is <a href="https://srfi.schemers.org/srfi-process.html">an explanation</a> of each status that a SRFI can hold.  To provide input on this SRFI, please send email to <code><a href="mailto:srfi+minus+41+at+srfi+dotschemers+dot+org">srfi-41@<span class="antispam">nospam</span>srfi.schemers.org</a></code>.  To subscribe to the list, follow <a href="https://srfi.schemers.org/srfi-list-subscribe.html">these instructions</a>.  You can access previous messages via the mailing list <a href="https://srfi-email.schemers.org/srfi-41">archive</a>.</p>
 
@@ -34,7 +29,7 @@ Philip L. Bewig
 <LI>Draft: 2007-10-21--2007-12-22
 </UL>
 
-<H1>Abstract</H1>
+<h2>Abstract</h2>
 
 <p align="justify"><font face="serif">Streams, sometimes 
 called lazy lists, are a sequential data structure containing elements 
@@ -58,7 +53,7 @@ stream libraries, say:</font></p>
 
 <p align="justify"><font face="monospace">(import (streams))</font></p>
 
-<H1>Rationale</H1>
+<h2>Rationale</h2>
 
 <p align="justify"><font face="serif">Harold Abelson 
 and Gerald Jay Sussman discuss streams at length, giving a strong justification 
@@ -119,9 +114,9 @@ savings are needed, or when they offer a clearer exposition of the algorithms
 that operate on the sequence.</font></p>
 
 
-<H1>Specification</H1>
+<h2>Specification</h2>
 
-<H2>The <font face="monospace">(streams primitive)</font><font face="serif"> library</font></H2>
+<h3>The <font face="monospace">(streams primitive)</font><font face="serif"> library</font></h3>
 
 <font face="serif">The </font><font face="monospace">(streams primitive)</font><font face="serif"> 
 library provides two mutually-recursive abstract data types:  An 
@@ -279,7 +274,7 @@ evens)) </font><font face="Symbol">&rArr;</font><font face="monospace">
 <p align="justify"><font face="monospace">(stream-car (stream-cdr 
 (stream-cdr evens))) </font><font face="Symbol">&rArr;</font><font face="monospace"> 4</font></p>
 
-<H2>The <font face="monospace">(streams derived)</font><font face="serif"> library</font></H2>
+<h3>The <font face="monospace">(streams derived)</font><font face="serif"> library</font></h3>
 
 <p align="justify"><font face="serif">The </font><font face="monospace">(streams derived)</font><font face="serif"> 
 library provides useful procedures and syntax that depend on the primitives 
@@ -1123,7 +1118,7 @@ although it calls </font><font face="monospace">stream-finds</font><font face="s
 the matches are computed lazily, and only the first match is needed 
 for </font><font face="monospace">stream-find</font><font face="serif">.</font></p>
 
-<H1>Utilities</H1>
+<h2>Utilities</h2>
 
 <p align="justify"><font face="serif">Streams, being 
 the signature structured data type of functional programming languages, 
@@ -1230,7 +1225,7 @@ and </font><font face="monospace">stream-iterate</font><font face="serif">:</fon
   (lsec stream-iterate (rsec + 1)))
  1)</pre></font></p>
 
-<H1>Examples</H1>
+<h2>Examples</h2>
 
 <p align="justify"><font face="serif">The examples 
 below show a few of the myriad ways streams can be exploited, as well 
@@ -1238,7 +1233,7 @@ as a few ways they can trip the unwary user.  All the examples
 are drawn from published sources; it is instructive to compare the Scheme 
 versions to the originals in other languages.</font></p>
 
-<H2>Infinite streams</H2>
+<h3>Infinite streams</h3>
 
 <p align="justify"><font face="serif">As a simple 
 illustration of infinite streams, consider this definition of the natural 
@@ -1356,7 +1351,7 @@ without duplicates:</font></p>
         (/ (- n -1 y))))
     1))</pre></font></p>
 
-<H2>Backtracking via the stream of successes</H2>
+<h3>Backtracking via the stream of successes</h3>
 
 <p align="justify"><font face="serif">Philip Wadler 
 describes the <i>stream of successes</i> technique that uses streams 
@@ -1460,7 +1455,7 @@ explicit backtracking in the code.  The </font><font face="monospace">stream-of<
 satisfy </font><font face="monospace">safe?</font><font face="serif">; 
 implicit backtracking occurs in the recursive call to </font><font face="monospace">queens</font><font face="serif">.</font></p>
 
-<H2>Generators and co-routines</H2>
+<h3>Generators and co-routines</h3>
 
 <p align="justify"><font face="serif">It is possible 
 to model generators and co-routines using streams.  Consider the task, 
@@ -1538,7 +1533,7 @@ different than the list solution presented above:</font></p>
 a data structure, replace generators or co-routines, which are control 
 structures, providing a fine example of how lazy streams enhance modularity.</font></p>
 
-<H2>A pipeline of procedures</H2>
+<h3>A pipeline of procedures</h3>
 
 <p align="justify"><font face="serif">Another way 
 in which streams promote modularity is enabling the use of many small 
@@ -1709,7 +1704,7 @@ and expressively.  The alternative is to build a single monolithic
 procedure for each task, which would be harder and involve repetitive 
 code.  Streams ensure procedures are called as needed.</font></p>
 
-<H2>Persistent data</H2>
+<h3>Persistent data</h3>
 
 <p align="justify"><font face="serif">Queues are 
 one of the fundamental data structures of computer science.  In 
@@ -1800,7 +1795,7 @@ rear to front, it need never be moved again in subsequent traversals
 of the queue.  Thus, the linear time-complexity to access all elements 
 in the queue, persistently, is restored. </font></p>
 
-<H2>Reducing two passes to one</H2>
+<h3>Reducing two passes to one</h3>
 
 <p align="justify"><font face="serif">The final example 
 is a lazy dictionary, where definitions and uses may occur in any order; 
@@ -1885,7 +1880,7 @@ run the requests and print the result:</font></p>
 <p align="justify"><font face="serif">The </font><font face="monospace">(put 4 &quot;d&quot;)</font><font face="serif"> 
 definition is never added to the dictionary because it is never needed.</font></p>
 
-<H2>Pitfalls</H2>
+<h3>Pitfalls</h3>
 
 <p align="justify"><font face="serif">Programming 
 with streams, or any lazy evaluator, can be tricky, even for programmers 
@@ -2093,7 +2088,7 @@ orders of magnitude slower than the equivalent expression using loops.</font></p
         (if (= (+ (* a a) (* b b)) (* c c))
             (display (list a b c)))))))</pre></font></p>
 
-<H1>Implementation</H1>
+<h2>Implementation</h2>
 
 <p align="justify"><font face="serif">Bird and Wadler 
 describe streams as either null or a pair with a stream in the tail:</font></p>
@@ -2215,7 +2210,7 @@ is biased toward functions that work with infinite streams left-to-right.
 In particular, there is no right-fold; if you need to materialize an entire stream, 
 it’s best to use a list.</font></p>
 
-<H2>Implementation of <font face="monospace">(streams primitive)</font></H2>
+<h3>Implementation of <font face="monospace">(streams primitive)</font></h3>
 
 <p align="justify"><font face="monospace">(library (streams primitive)</font></p>
 
@@ -2302,7 +2297,7 @@ it’s best to use a list.</font></p>
       ((stream-lambda formals body0 body1 ...)
         (lambda formals (stream-lazy (let () body0 body1 ...)))))))</pre></font></p>
 
-<H2>Implementation of <font face="monospace">(streams derived)</font></H2>
+<h3>Implementation of <font face="monospace">(streams derived)</font></h3>
 
 <p align="justify"><font face="monospace">(library (streams derived)</font></p>
 
@@ -2699,7 +2694,7 @@ it’s best to use a list.</font></p>
             (error 'stream-zip "non-stream argument"))
           (else (stream-zip strms)))))</pre></font></p>
 
-<H2>Implementation of <font face="monospace">(streams)</font></H2>
+<h3>Implementation of <font face="monospace">(streams)</font></h3>
 
 <p align="justify"><font face="monospace">(library (streams)</font></p>
 
@@ -2715,14 +2710,14 @@ it’s best to use a list.</font></p>
 <p align="justify"><font face="monospace"><pre>
   (import (streams primitive) (streams derived)))</pre></font></p>
 
-<H1>Acknowledgements</H1>
+<h2>Acknowledgements</h2>
 
 <p align="justify"><font face="serif">Jos Koot sharpened 
 my thinking during many e-mail discussions, suggested several discussion 
 points in the text, and contributed the final version of </font><font face="monospace">stream-match</font><font face="serif">.  
 Michael Sperber and Abdulaziz Ghuloum gave advice on R6RS.</font></p>
 
-<H1>References</H1>
+<h2>References</h2>
 
 <p align="justify"><font face="serif">Harold Abelson 
 and Gerald Jay Sussman with Julie Sussman.  <i>Structure and Interpretation 
@@ -2839,7 +2834,7 @@ functional language SML. </font></p>
 <p align="justify"><font face="serif">All cited web 
 pages visited during September 2007.</font></p>
 
-<H1>Copyright</H1>
+<h2>Copyright</h2>
 
 <p align="justify"><font face="serif">
 Copyright (C) Philip L. Bewig (2007). All Rights Reserved.</p>
